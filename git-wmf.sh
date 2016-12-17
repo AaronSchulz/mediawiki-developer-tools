@@ -6,7 +6,7 @@ fakeBasePath='$IP/extensions/'
 scriptPath=$(readlink -f "$0")
 scriptDir=$(dirname ${scriptPath})
 curDir=$(readlink -f "$PWD")
-threads=10
+threads=8
 operation=$1
 summary=$2
 
