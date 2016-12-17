@@ -31,10 +31,7 @@ pull_ext_repo() {
 		git clone "https://gerrit.wikimedia.org/r/p/${basePath}${PROJECT}.git" "${PROJECT}" && \
 		cd "${PROJECT}" \
 		git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
-		git checkout master && git pull && git submodule update
-		git config core.filemode false
-		git config core.fsCache true
-		git config core.core.preloadindex true
+		git checkout master && git pull && git submodule update && git config core.filemode false
 	else
 		cd "${PROJECT}" && \
 		git checkout master 2>/dev/null && git reset --hard master && \
