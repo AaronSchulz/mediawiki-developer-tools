@@ -2,15 +2,16 @@
 
 # Config
 basePath="mediawiki/extensions/"
-scriptPath=$(readlink -f "$0")
-scriptDir=$(dirname ${scriptPath})
-curDir=$(readlink -f "$PWD")
 threads=8
 operation=$1
 summary=$2
 
-if [ "$scriptDir" != "$curDir" ]; then
-	echo "pull-extensions must be run from $scriptDir; not $curDir"
+# Sanity check the working directory to avoid making git checkout spam
+# Note: this handles the case where the bash script is a symlink to the git repo version
+REALPATH=$(pwd -P)
+DIRECTORY=$(basename "$REALPATH")
+if [ "$DIRECTORY" != "extensions" ]; then
+	echo "pull-extensions must be run from 'extensions' directory"
 	exit 1
 fi
 
@@ -31,14 +32,14 @@ pull_ext_repo() {
 		cd "${PROJECT}" \
 		git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
 		git checkout master && git pull && git submodule update
+		git config core.filemode false
+		git config core.fsCache true
+		git config core.core.preloadindex true
 	else
 		cd "${PROJECT}" && \
 		git checkout master 2>/dev/null && git reset --hard master && \
 		timeout 30 git pull && timeout 30 git submodule update
 	fi
-    git config core.filemode false
-    git config core.fsCache true
-    git config core.core.preloadindex true
 }
 
 commit_ext_repo() {
@@ -71,12 +72,15 @@ reset_ext_repo() {
 	fi
 }
 
-subprocs=0
 # Script to clone any missing extensions and updates the others
-curl -s "https://gerrit.wikimedia.org/r/projects/?format=text" | \
+echo -n "Retrieving known MediaWiki extension list..."
+MODULES=($(curl -s "https://gerrit.wikimedia.org/r/projects/?format=text" | \
 grep "^${basePath}" | \
-sed "s,${basePath},," | \
-while read PROJECT; do
+sed "s,${basePath},,"))
+echo "done"
+
+subprocs=0
+for PROJECT in "${MODULES[@]}"; do
     (
     PROJECT=$(rem_trailing_slash "${PROJECT}")
 

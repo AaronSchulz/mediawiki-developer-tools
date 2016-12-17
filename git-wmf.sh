@@ -3,20 +3,21 @@
 # Config
 repoBasePath='mediawiki/extensions/'
 fakeBasePath='$IP/extensions/'
-scriptPath=$(readlink -f "$0")
-scriptDir=$(dirname ${scriptPath})
-curDir=$(readlink -f "$PWD")
 threads=8
 operation=$1
 summary=$2
 
-if [ "$scriptDir" != "$curDir" ]; then
-	echo "pull-extensions must be run from $scriptDir; not $curDir"
+# Sanity check the working directory to avoid making git checkout spam
+# Note: this handles the case where the bash script is a symlink to the git repo version
+REALPATH=$(pwd -P)
+DIRECTORY=$(basename "$REALPATH")
+if [ "$DIRECTORY" != "extensions" ]; then
+	echo "pull-extensions must be run from 'extensions' directory"
 	exit 1
 fi
 
 if [ -z "$operation" ]; then
-	echo "Missing operation argument"
+	echo "Missing operation argument (pull, fetch)"
 	exit 1
 fi
 
@@ -72,13 +73,16 @@ reset_ext_repo() {
 	fi
 }
 
-subprocs=0
 # Script to clone any missing extensions and updates the others
-curl -sL "https://phabricator.wikimedia.org/diffusion/OMWC/browse/master/wmf-config/extension-list?view=raw" | \
+echo -n "Retrieving Wikimedia-deployed MediaWiki extension list..."
+MODULES=($(curl -sL "https://phabricator.wikimedia.org/diffusion/OMWC/browse/master/wmf-config/extension-list?view=raw" | \
 grep "${fakeBasePath}" | \
 sed "s,${fakeBasePath},," | \
-sed "s,/.*$,," | \
-while read PROJECT; do
+sed "s,/.*$,,"))
+echo "done"
+
+subprocs=0
+for PROJECT in "${MODULES[@]}"; do
     (
     PROJECT=$(rem_trailing_slash "${PROJECT}")
 
