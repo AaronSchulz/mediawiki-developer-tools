@@ -72,7 +72,7 @@ reset_ext_repo() {
 
 # Script to clone any missing extensions and updates the others
 echo -n "Retrieving Wikimedia-deployed MediaWiki extension list..."
-MODULES=($(curl -sL "https://phabricator.wikimedia.org/diffusion/OMWC/browse/master/wmf-config/extension-list?view=raw" | \
+MODULES=($(curl -sL "https://phab.wmfusercontent.org/file/data/pnzf7ukkvrn6jdhydf3l/PHID-FILE-udex2c2yo3vjgblc5nbp/extension-list" | \
 grep "${fakeBasePath}" | \
 sed "s,${fakeBasePath},," | \
 sed "s,/.*$,,"))
