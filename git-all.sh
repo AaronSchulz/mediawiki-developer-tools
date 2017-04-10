@@ -28,9 +28,9 @@ pull_ext_repo() {
 	PROJECT=$1
 	if [ ! -d "${PROJECT}" ]; then
 	    timeout 60 \
-		git clone "https://gerrit.wikimedia.org/r/p/${basePath}${PROJECT}.git" "${PROJECT}" && \
+		git clone "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" &&
 		cd "${PROJECT}" \
-		git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
+		git remote add gerrit "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" &&
 		git checkout master && git pull && git submodule update && git config core.filemode false
 	else
 		cd "${PROJECT}" && \
