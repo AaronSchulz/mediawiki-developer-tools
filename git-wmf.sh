@@ -58,9 +58,16 @@ push_ext_repo() {
 }
 
 reset_ext_repo() {
-	PROJECT=$2
+	PROJECT=$1
 	if [ -d "${PROJECT}" ]; then
 	    cd "${PROJECT}" && timeout 60 git reset --hard && git checkout master
+	fi
+}
+
+clean_ext_repo() {
+	PROJECT=$1
+	if [ -d "${PROJECT}" ]; then
+	    cd "${PROJECT}" && timeout 60 git reset --hard && git clean -xf
 	fi
 }
 
@@ -90,6 +97,8 @@ for PROJECT in "${MODULES[@]}"; do
         info=$(push_ext_repo "${PROJECT}")
     elif [ "$operation" == "reset" ]; then
         info=$(reset_ext_repo "${PROJECT}")
+    elif [ "$operation" == "clean" ]; then
+        info=$(clean_ext_repo "${PROJECT}")
     else
         echo "Invalid operation: $operation."
         exit 1
