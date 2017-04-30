@@ -29,9 +29,8 @@ pull_ext_repo() {
 	PROJECT=$1
 	if [ ! -d "${PROJECT}" ]; then
 	    timeout 60 \
-		git clone "https://gerrit.wikimedia.org/r/p/${repoBasePath}${PROJECT}.git" "${PROJECT}" && \
-		cd "${PROJECT}" \
-		git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${repoBasePath}${PROJECT}" && \
+		git clone "ssh://gerrit.wikimedia.org:29418/${repoBasePath}${PROJECT}" && \
+		cd "${PROJECT}" && \
 		git checkout master && git pull && git submodule update && git config core.filemode false
 	else
 		cd "${PROJECT}" && \
@@ -54,19 +53,14 @@ commit_ext_repo() {
 push_ext_repo() {
 	PROJECT=$1
 	if [ -d "${PROJECT}" ]; then
-	    cd "${PROJECT}"
-		timeout 60 git remote update && git push -f && git reset --hard origin/master
+	    cd "${PROJECT}" && timeout 60 git remote update && git push -f && git reset --hard origin/master
 	fi
 }
 
 reset_ext_repo() {
-    BASEPATH=$1
 	PROJECT=$2
 	if [ -d "${PROJECT}" ]; then
-	    cd "${PROJECT}"
-	    git remote set-url origin "https://gerrit.wikimedia.org/r/p/${BASEPATH}${PROJECT}.git"
-	    git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
-		timeout 60 git remote update && git checkout master
+	    cd "${PROJECT}" && timeout 60 git reset --hard && git checkout master
 	fi
 }
 
@@ -95,8 +89,7 @@ for PROJECT in "${MODULES[@]}"; do
     elif [ "$operation" == "push" ]; then
         info=$(push_ext_repo "${PROJECT}")
     elif [ "$operation" == "reset" ]; then
-        echo "${repoBasePath}" "${PROJECT}"
-        info=$(reset_ext_repo "${repoBasePath}" "${PROJECT}")
+        info=$(reset_ext_repo "${PROJECT}")
     else
         echo "Invalid operation: $operation."
         exit 1
