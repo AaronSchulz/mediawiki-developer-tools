@@ -27,10 +27,9 @@ rem_trailing_slash() {
 pull_ext_repo() {
 	PROJECT=$1
 	if [ ! -d "${PROJECT}" ]; then
-	    timeout 60 \
-		git clone "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" &&
-		cd "${PROJECT}" \
-		git remote add gerrit "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" &&
+		timeout 60 \
+		git clone "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
+		cd "${PROJECT}" && \
 		git checkout master && git pull && git submodule update && git config core.filemode false
 	else
 		cd "${PROJECT}" && \
