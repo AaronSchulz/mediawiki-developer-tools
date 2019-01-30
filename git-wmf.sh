@@ -31,7 +31,7 @@ pull_ext_repo() {
 	    timeout 60 \
 		git clone "ssh://gerrit.wikimedia.org:29418/${repoBasePath}${PROJECT}" && \
 		cd "${PROJECT}" && \
-		git checkout master && git pull && git submodule update && git config core.filemode false
+		git checkout master && git pull && git submodule update && git config core.fileMode false
 	else
 		cd "${PROJECT}" && \
 		git checkout master 2>/dev/null && git reset --hard master && \

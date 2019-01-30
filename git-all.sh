@@ -29,7 +29,7 @@ pull_ext_repo() {
 	if [ ! -d "${PROJECT}" ]; then
 		timeout 60 git clone "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
 		cd "${PROJECT}" && \
-		git config core.filemode false && \
+		git config core.fileMode false && \
 		git checkout master && \
 		timeout 60 git submodule update --init --recursive
 	else
