@@ -2,7 +2,7 @@
 
 # Config
 basePath="mediawiki/extensions/"
-threads=8
+threads=4
 operation=$1
 summary=$2
 
@@ -35,6 +35,7 @@ pull_ext_repo() {
 	else
 		cd "${PROJECT}" && \
 		timeout 30 git fetch && \
+		git config core.fileMode false && \
 		git checkout master 2>/dev/null && \
 		git reset --hard origin/master && \
 		timeout 30 git submodule update --recursive
@@ -44,9 +45,8 @@ pull_ext_repo() {
 commit_ext_repo() {
 	PROJECT=$1
 	SUMMARY=$2
-	if [ -d "${PROJECT}" ]; then
-	    cd "${PROJECT}"
-		if [ -n $(git diff) ]; then
+	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
+		if [ -n "$(git status --porcelain)" ]; then
 		    git commit -a -m "$SUMMARY"
         fi
 	fi
@@ -54,17 +54,30 @@ commit_ext_repo() {
 
 push_ext_repo() {
 	PROJECT=$1
-	if [ -d "${PROJECT}" ]; then
-	    cd "${PROJECT}"
-		timeout 60 git remote update && git push -f && git reset --hard origin/master
+	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
+	    CHANGES=$(git log origin/master..HEAD)
+	    if [ -n "${CHANGES}" ]; then
+	        echo $CHANGES
+		    timeout 60 git remote update && git push -f && git reset --hard origin/master
+		fi
+	fi
+}
+
+review_ext_repo() {
+	PROJECT=$1
+	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
+	    CHANGES=$(git log origin/master..HEAD)
+	    if [ -n "${CHANGES}" ]; then
+	        echo $CHANGES
+		    timeout 60 git remote update && git-review && git reset --hard origin/master
+		fi
 	fi
 }
 
 reset_ext_repo() {
     BASEPATH=$1
 	PROJECT=$2
-	if [ -d "${PROJECT}" ]; then
-	    cd "${PROJECT}"
+	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
 	    git remote set-url origin "https://gerrit.wikimedia.org/r/p/${BASEPATH}${PROJECT}.git"
 	    git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
 		timeout 60 git remote update && git checkout master
@@ -94,6 +107,8 @@ for PROJECT in "${MODULES[@]}"; do
         info=$(commit_ext_repo "${PROJECT}" "${summary}")
     elif [ "$operation" == "push" ]; then
         info=$(push_ext_repo "${PROJECT}")
+    elif [ "$operation" == "review" ]; then
+        info=$(review_ext_repo "${PROJECT}")
     elif [ "$operation" == "reset" ]; then
         echo "${basePath}" "${PROJECT}"
         info=$(reset_ext_repo "${basePath}" "${PROJECT}")
