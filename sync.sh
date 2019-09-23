@@ -10,14 +10,14 @@ sync_project() {
 
   [ -d "${SRC}/.git/" ] || return 0
 
-  # Short-circuit
+  # Short-circuit if the directory is already updated
   local SRC_MTIME=$(stat -c %y "${SRC}")
   local DST_MTIME=$(stat -c %y "${DST}")
   [ "${SRC_MTIME}" != "${DST_MTIME}" ] || return 0
   # Ignore irrelevant timestamp changes on .git and .git/index
   echo "${SRC} -> ${DST} (.git)"
   echo "${SRC_MTIME} -> ${DST_MTIME}"
-  local FLIST=$(rsync -rltDi "${SRC}/.git/" "${DST}/.git" | grep -vP ' (\./|index)$')
+  local FLIST=$(rsync -rltDoi "${SRC}/.git/" "${DST}/.git" | grep -vP ' (\./|index)$')
   if [ -n "${FLIST}" ]; then
     echo "${FLIST}"
     if ! cd "${DST}"; then
@@ -39,7 +39,7 @@ sync_project() {
     if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
       echo "${SRC} -> ${DST} (vendor)"
       echo "${SRC_VENDOR_MTIME} -> ${DST_VENDOR_MTIME}"
-      rsync -rltDi "${SRC}/vendor/" "${DST}/vendor" &&
+      rsync -rltDoi "${SRC}/vendor/" "${DST}/vendor" &&
       touch -m --date="${SRC_MTIME}" "${DST}/vendor"
     fi
   fi
@@ -63,8 +63,9 @@ sync_subprojects() {
   wait
 }
 
-trap "exit" INT
+trap "wait && exit" INT
 
+rsync -rltDoi --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
 sync_project "${W10_CORE}" "${WSL_CORE}" &
 sync_subprojects "${W10_CORE}" "${WSL_CORE}" "skins" &
 
