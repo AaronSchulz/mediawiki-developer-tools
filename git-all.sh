@@ -25,7 +25,7 @@ rem_trailing_slash() {
 }
 
 pull_ext_repo() {
-	PROJECT=$1
+	local PROJECT=$1
 	if [ ! -d "${PROJECT}" ]; then
 		timeout 60 git clone "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
 		cd "${PROJECT}" && \
@@ -43,53 +43,64 @@ pull_ext_repo() {
 }
 
 commit_ext_repo() {
-	PROJECT=$1
-	SUMMARY=$2
+	local PROJECT=$1
+	local SUMMARY=$2
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
 		if [ -n "$(git status --porcelain)" ]; then
-		    git commit -a -m "$SUMMARY"
-        fi
+		  git commit -a -m "$SUMMARY"
+    fi
 	fi
 }
 
 push_ext_repo() {
-	PROJECT=$1
+	local PROJECT=$1
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-	    CHANGES=$(git log origin/master..HEAD)
-	    if [ -n "${CHANGES}" ]; then
-	        echo $CHANGES
-		    timeout 60 git remote update && git push -f && git reset --hard origin/master
+    local CHANGES=$(git log origin/master..HEAD)
+    if [ -n "${CHANGES}" ]; then
+      echo $CHANGES
+      timeout 60 git remote update && git push -f && git reset --hard origin/master
 		fi
 	fi
 }
 
 review_ext_repo() {
-	PROJECT=$1
+	local PROJECT=$1
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-	    CHANGES=$(git log origin/master..HEAD)
-	    if [ -n "${CHANGES}" ]; then
-	        echo $CHANGES
-		    timeout 60 git remote update && git-review && git reset --hard origin/master
+    local CHANGES=$(git log origin/master..HEAD)
+    if [ -n "${CHANGES}" ]; then
+      echo $CHANGES
+      timeout 60 git remote update && git-review && git reset --hard origin/master
 		fi
 	fi
 }
 
 reset_ext_repo() {
-    BASEPATH=$1
-	PROJECT=$2
+  local BASEPATH=$1
+	local PROJECT=$2
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-	    git remote set-url origin "https://gerrit.wikimedia.org/r/p/${BASEPATH}${PROJECT}.git"
-	    git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
+    git remote set-url origin "https://gerrit.wikimedia.org/r/p/${BASEPATH}${PROJECT}.git"
+    git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
 		timeout 60 git remote update && git checkout master
 	fi
 }
 
 # Script to clone any missing extensions and updates the others
-echo -n "Retrieving known MediaWiki extension list..."
-MODULES=($(curl -s "https://gerrit.wikimedia.org/r/projects/?format=text" | \
-grep "^${basePath}" | \
-sed "s,${basePath},,"))
-echo "done"
+if [ -n "${GIT_ALL_WMF_ONLY}" ]; then
+  fakeBasePath='$IP/extensions/'
+  echo -n "Retrieving Wikimedia-deployed MediaWiki extension list..."
+  MODULES=($(curl -sL "https://raw.githubusercontent.com/wikimedia/operations-mediawiki-config/master/wmf-config/extension-list" | \
+  grep "${fakeBasePath}" | \
+  sed "s,${fakeBasePath},," | \
+  sed "s,/.*$,,"))
+  echo "done"
+  echo $MODULES
+else
+  echo -n "Retrieving known MediaWiki extension list..."
+  MODULES=($(curl -s "https://gerrit.wikimedia.org/r/projects/?format=text" | \
+  grep "^${basePath}" | \
+  sed "s,${basePath},,"))
+  echo "done"
+fi
 
 subprocs=0
 for PROJECT in "${MODULES[@]}"; do
