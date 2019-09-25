@@ -8,15 +8,18 @@ sync_project() {
   local SRC=$1
   local DST=$2
 
-  [ -d "${SRC}/.git/" ] || return 0
+  local SRC_GIT_MTIME=$(stat -c %y "${SRC}/.git/HEAD" 2>/dev/null)
+  if [ -z "${SRC_GIT_MTIME}" ]; then
+    echo "No .git directory in ${SRC}"
+    return 1;
+  fi
 
   # Short-circuit if the directory is already updated
-  local SRC_MTIME=$(stat -c %y "${SRC}")
-  local DST_MTIME=$(stat -c %y "${DST}")
-  [ "${SRC_MTIME}" != "${DST_MTIME}" ] || return 0
+  local DST_GIT_MTIME=$(stat -c %y "${DST}/.git/HEAD" 2>/dev/null)
+  [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ] || return 0
   # Ignore irrelevant timestamp changes on .git and .git/index
   echo "${SRC} -> ${DST} (.git)"
-  echo "${SRC_MTIME} -> ${DST_MTIME}"
+  echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
   local FLIST=$(rsync -rltDoi "${SRC}/.git/" "${DST}/.git" | grep -vP ' (\./|index)$')
   if [ -n "${FLIST}" ]; then
     echo "${FLIST}"
@@ -31,16 +34,16 @@ sync_project() {
     fi
   fi
   # Mark directory as updated
-  touch -m --date="${SRC_MTIME}" "${DST}"
+  touch -m --date="${SRC_GIT_MTIME}" "${DST}/.git"
 
-  if [ -f "${SRC}/composer.lock" ]; then
-    SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor")
-    DST_VENDOR_MTIME=$(stat -c %y "${DST}/vendor")
+  local SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
+  if [ -n "${SRC_VENDOR_MTIME}" ]; then
+    local DST_VENDOR_MTIME=$(stat -c %y "${DST}/vendor" 2>/dev/null)
     if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
       echo "${SRC} -> ${DST} (vendor)"
-      echo "${SRC_VENDOR_MTIME} -> ${DST_VENDOR_MTIME}"
+      echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
       rsync -rltDoi "${SRC}/vendor/" "${DST}/vendor" &&
-      touch -m --date="${SRC_MTIME}" "${DST}/vendor"
+      touch -m --date="${SRC_VENDOR_MTIME}" "${DST}/vendor"
     fi
   fi
 }
@@ -65,9 +68,10 @@ sync_subprojects() {
 
 trap "wait && exit" INT
 
-rsync -rltDoi --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
 sync_project "${W10_CORE}" "${WSL_CORE}" &
-sync_subprojects "${W10_CORE}" "${WSL_CORE}" "skins" &
+
+SKIN_NAMES=($(find "${W10_CORE}/skins/"* -maxdepth 0 -type d -printf "%f\n"))
+sync_subprojects "${W10_CORE}/skins" "${WSL_CORE}/skins" "${SKIN_NAMES[@]}" &
 
 if [ "$CATEGORY" == "wmf" ]; then
   if ! test `find ".wmf-extensions.list.cache" -mmin -86400`; then
@@ -76,15 +80,16 @@ if [ "$CATEGORY" == "wmf" ]; then
     curl -sL "https://raw.githubusercontent.com/wikimedia/operations-mediawiki-config/master/wmf-config/extension-list" | \
     grep "${PATH_PREFIX}" | \
     sed "s,${PATH_PREFIX},," | \
-    sed "s,/.*$,," > .wmf-extensions.list.cache
+    sed "s,/.*$,," > "${W10_CORE}/extensions/.wmf-extensions.list.cache"
     echo "done"
   fi
-  EXTENSION_NAMES=($(cat ".wmf-extensions.list.cache"))
+  EXTENSION_NAMES=($(cat "${W10_CORE}/extensions/.wmf-extensions.list.cache"))
 else
-  EXTENSION_NAMES=($(ls "${W10_CORE}/extensions"))
+  EXTENSION_NAMES=($(find "${W10_CORE}/extensions/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
-
 sync_subprojects "${W10_CORE}/extensions" "${WSL_CORE}/extensions" "${EXTENSION_NAMES[@]}" &
+
+rsync -rltDoi --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
 
 wait
 exit
