@@ -1,7 +1,8 @@
 #!/bin/bash
 
-W10_CORE="/mnt/c/Users/aschu/PhpstormProjects/wsl_core"
-WSL_CORE="/home/aaron/OSS/core";
+W10_USER=$(whoami.exe | grep -Po '[^\\]+$' | tr -d '\r')
+W10_CORE="/mnt/c/Users/${W10_USER}/PhpstormProjects/wsl_core"
+WSL_CORE="${HOME}/OSS/core";
 CATEGORY=$1
 
 sync_project() {
@@ -43,6 +44,17 @@ sync_project() {
       echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
       rsync -rltDoi "${SRC}/vendor/" "${DST}/vendor" &&
       touch -m --date="${SRC_VENDOR_MTIME}" "${DST}/vendor"
+    fi
+  fi
+
+  local SRC_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
+  if [ -n "${SRC_NODE_MTIME}" ]; then
+    local DST_NODE_MTIME=$(stat -c %y "${DST}/node_modules" 2>/dev/null)
+    if [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
+      echo "${SRC} -> ${DST} (node_modules)"
+      echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
+      rsync -rltDoi "${SRC}/node_modules/" "${DST}/node_modules" &&
+      touch -m --date="${SRC_NODE_MTIME}" "${DST}/node_modules"
     fi
   fi
 }
