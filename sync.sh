@@ -9,31 +9,37 @@ sync_project() {
   local SRC=$1
   local DST=$2
 
-  local SRC_GIT_MTIME=$(stat -c %y "${SRC}/.git/objects" 2>/dev/null)
+  SAVEIFS=$IFS
+  IFS=$'\n'
+  local MTIMES=($(stat -c %y "${SRC}/.git/objects" "${DST}/.git/objects" 2>/dev/null))
+  local SRC_GIT_MTIME=${MTIMES[0]}
+  local DST_GIT_MTIME=${MTIMES[1]}
+  IFS=$SAVEIFS
+
   if [ -z "${SRC_GIT_MTIME}" ]; then
     echo "No .git directory in ${SRC}"
     return 1;
   fi
 
-  # Short-circuit if the directory is already updated
-  local DST_GIT_MTIME=$(stat -c %y "${DST}/.git/objects" 2>/dev/null)
+  # Short-circuit if the git directory is already synced
   [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ] || return 0
-  # Ignore irrelevant timestamp changes on .git and .git/index
+
   echo "${SRC} -> ${DST} (.git)"
   echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
-  local FLIST=$(rsync -rltDoi "${SRC}/.git/" "${DST}/.git" | grep -vP ' (\./|index)$')
-  if [ -n "${FLIST}" ]; then
-    echo "${FLIST}"
-    if ! cd "${DST}"; then
-      echo "Could not cd into ${DST}"
-      return 1;
-    fi
+  rsync -rltDoi "${SRC}/.git/" "${DST}/.git"
+
+  # Reset the working directory to git HEAD
+  if cd "${DST}"; then
     if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
       echo "${SRC} -> ${DST} (checkout)"
       git reset --hard 1>/dev/null
     fi
+  else
+    echo "Could not cd into ${DST}"
+    return 1;
   fi
-  # Mark directory as updated
+
+  # Mark git/working directory as updated
   touch -m --date="${SRC_GIT_MTIME}" "${DST}/.git/objects"
 
   local SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
