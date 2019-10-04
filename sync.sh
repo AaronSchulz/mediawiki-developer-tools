@@ -11,7 +11,7 @@ sync_project() {
 
   SAVEIFS=$IFS
   IFS=$'\n'
-  local MTIMES=($(stat -c %y "${SRC}/.git/objects" "${DST}/.git/objects" 2>/dev/null))
+  local MTIMES=($(stat -c %y "${SRC}/.git/index" "${DST}/.git/index" 2>/dev/null))
   local SRC_GIT_MTIME=${MTIMES[0]}
   local DST_GIT_MTIME=${MTIMES[1]}
   IFS=$SAVEIFS
@@ -40,7 +40,7 @@ sync_project() {
   fi
 
   # Mark git/working directory as updated
-  touch -m --date="${SRC_GIT_MTIME}" "${DST}/.git/objects"
+  touch -m --date="${SRC_GIT_MTIME}" "${DST}/.git/index"
 
   local SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
   if [ -n "${SRC_VENDOR_MTIME}" ]; then
