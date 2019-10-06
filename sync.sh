@@ -28,11 +28,12 @@ sync_project() {
   echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
   rsync -rltDoi "${SRC}/.git/" "${DST}/.git"
 
-  # Reset the working directory to git HEAD
+  # Reset working directory to git HEAD and purge excess files (not dirs with a .git dir)
   if cd "${DST}"; then
     if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
       echo "${SRC} -> ${DST} (checkout)"
-      git reset --hard 1>/dev/null
+      git reset --hard 1>/dev/null &&
+      git clean -xfd --exclude='vendor/**' --exclude='node_modules/**'
     fi
   else
     echo "Could not cd into ${DST}"
