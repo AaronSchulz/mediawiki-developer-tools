@@ -88,16 +88,17 @@ SKIN_NAMES=($(find "${W10_CORE}/skins/"* -maxdepth 0 -type d -printf "%f\n"))
 sync_subprojects "${W10_CORE}/skins" "${WSL_CORE}/skins" "${SKIN_NAMES[@]}" &
 
 if [ "$CATEGORY" == "wmf" ]; then
-  if ! test `find ".wmf-extensions.list.cache" -mmin -86400`; then
+  CACHE_FILE="${W10_CORE}/extensions/.wmf-extensions.list.cache"
+  if ! test `find "${CACHE_FILE}" -mmin -86400`; then
     echo -n "Retrieving Wikimedia-deployed MediaWiki extension list..."
     PATH_PREFIX='$IP/extensions/'
     curl -sL "https://raw.githubusercontent.com/wikimedia/operations-mediawiki-config/master/wmf-config/extension-list" | \
     grep "${PATH_PREFIX}" | \
     sed "s,${PATH_PREFIX},," | \
-    sed "s,/.*$,," > "${W10_CORE}/extensions/.wmf-extensions.list.cache"
+    sed "s,/.*$,," > "${CACHE_FILE}"
     echo "done"
   fi
-  EXTENSION_NAMES=($(cat "${W10_CORE}/extensions/.wmf-extensions.list.cache"))
+  EXTENSION_NAMES=($(cat "${CACHE_FILE}"))
 else
   EXTENSION_NAMES=($(find "${W10_CORE}/extensions/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
