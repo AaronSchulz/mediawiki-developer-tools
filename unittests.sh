@@ -2,7 +2,6 @@
 ARGS="$@"
 ./sync.sh
 (
-  [ $(cd "${HOME}/OSS/core") ] || exit 1
   # Use Git for Windows git for the WIN10 path
   local CHANGES=$(git.exe diff --name-only)
   if [ -n "${CHANGES}" ]; then
