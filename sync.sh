@@ -17,7 +17,7 @@ sync_project() {
   IFS=$SAVEIFS
 
   if [ -z "${SRC_GIT_MTIME}" ]; then
-    echo "No .git directory in ${SRC}"
+    #echo "No .git directory in ${SRC}"
     return 1;
   fi
 
@@ -26,18 +26,14 @@ sync_project() {
 
   echo "${SRC} -> ${DST} (.git)"
   echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
-  rsync -rltDoi "${SRC}/.git/" "${DST}/.git"
+  rsync -d "${SRC}" "${DST}" && rsync -rltDoi "${SRC}/.git/" "${DST}/.git"
 
   # Reset working directory to git HEAD and purge excess files (not dirs with a .git dir)
-  if cd "${DST}"; then
-    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-      echo "${SRC} -> ${DST} (checkout)"
-      git reset --hard 1>/dev/null &&
-      git clean -xfd --exclude='vendor/**' --exclude='node_modules/**'
-    fi
-  else
-    echo "Could not cd into ${DST}"
-    return 1;
+  [ $(cd "${DST}") ] || return 1
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "${SRC} -> ${DST} (checkout)"
+    git reset --hard 1>/dev/null &&
+    git clean -xfd --exclude='vendor/**' --exclude='node_modules/**'
   fi
 
   # Mark git/working directory as updated
