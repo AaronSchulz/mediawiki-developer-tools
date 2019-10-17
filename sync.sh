@@ -26,7 +26,7 @@ sync_project() {
 
   echo "${SRC} -> ${DST} (.git)"
   echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
-  rsync -d "${SRC}" "${DST}" && rsync -rltDoi "${SRC}/.git/" "${DST}/.git"
+  rsync -dq "${SRC}" "${DST}" && rsync -rltDoiq "${SRC}/.git/" "${DST}/.git"
 
   # Reset working directory to git HEAD and purge excess files (not dirs with a .git dir)
   [ $(cd "${DST}") ] || return 1
@@ -45,7 +45,7 @@ sync_project() {
     if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
       echo "${SRC} -> ${DST} (vendor)"
       echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
-      rsync -rltDoi "${SRC}/vendor/" "${DST}/vendor" &&
+      rsync -rltDoiq "${SRC}/vendor/" "${DST}/vendor" &&
       touch -m --date="${SRC_VENDOR_MTIME}" "${DST}/vendor"
     fi
   fi
@@ -56,7 +56,7 @@ sync_project() {
     if [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
       echo "${SRC} -> ${DST} (node_modules)"
       echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
-      rsync -rltDoi "${SRC}/node_modules/" "${DST}/node_modules" &&
+      rsync -rltDoiq "${SRC}/node_modules/" "${DST}/node_modules" &&
       touch -m --date="${SRC_NODE_MTIME}" "${DST}/node_modules"
     fi
   fi
@@ -84,6 +84,7 @@ trap "wait && exit" INT
 
 sync_project "${W10_CORE}" "${WSL_CORE}" &
 
+rsync -dq "${W10_CORE}/skins" "${WSL_CORE}/skins"
 SKIN_NAMES=($(find "${W10_CORE}/skins/"* -maxdepth 0 -type d -printf "%f\n"))
 sync_subprojects "${W10_CORE}/skins" "${WSL_CORE}/skins" "${SKIN_NAMES[@]}" &
 
@@ -102,9 +103,10 @@ if [ "$CATEGORY" == "wmf" ]; then
 else
   EXTENSION_NAMES=($(find "${W10_CORE}/extensions/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
+rsync -dq "${W10_CORE}/extensions" "${WSL_CORE}/extensions"
 sync_subprojects "${W10_CORE}/extensions" "${WSL_CORE}/extensions" "${EXTENSION_NAMES[@]}" &
 
-rsync -rltDoi --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
+rsync -rltDoiq --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
 
 wait
 exit
