@@ -26,14 +26,19 @@ sync_project() {
     echo "${SRC} -> ${DST} (.git)"
     echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
     rsync -dq "${SRC}/" "${DST}" && rsync -rltDoiq "${SRC}/.git/" "${DST}/.git"
-    # Reset working directory to git HEAD and purge excess files
-    [ $(cd "${DST}") ] || return 1
-    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-      echo "${SRC} -> ${DST} (checkout)"
-      git reset --hard 1>/dev/null &&
-      # Note: this excludes dirs with a .git dir, as well as composer/npm dirs
-      git clean -xfd --exclude='vendor/**' --exclude='node_modules/**'
-    fi
+
+    (
+      cd "${DST}" || exit 1
+      if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+        echo "${SRC} -> ${DST} (checkout)"
+        git status --porcelain --untracked-files=no
+        # Reset working directory to git HEAD
+        git reset --hard 1>/dev/null &&
+        # Purge excess files (ignoring composer/npm and dirs with a .git dir)
+        git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' 1>/dev/null
+      fi
+    ) || return 1
+
     # Mark git/working directory as updated
     touch -m --date="${SRC_GIT_MTIME}" "${DST}/.git/index"
   fi
