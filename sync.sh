@@ -2,7 +2,7 @@
 
 W10_USER=$(/mnt/c/WINDOWS/system32/whoami.exe | grep -Po '[^\\]+$' | tr -d '\r')
 W10_CORE="/mnt/c/Users/${W10_USER}/PhpstormProjects/wsl_core"
-WSL_CORE="${HOME}/OSS/core";
+WSL_CORE="/srv/mediawiki/core";
 CATEGORY=$1
 
 sync_project() {
