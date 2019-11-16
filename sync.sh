@@ -35,7 +35,7 @@ sync_project() {
         # Reset working directory to git HEAD
         git reset --hard 1>/dev/null &&
         # Purge excess files (ignoring composer/npm and dirs with a .git dir)
-        git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' 1>/dev/null
+        git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' --exclude='*Settings.php' 1>/dev/null
       fi
     ) || return 1
 

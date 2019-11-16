@@ -10,5 +10,5 @@ ARGS="$@"
     echo "${CHANGES}"
     exit 1
   fi
-  sudo -u www-data php "${WSL_CORE}/tests/phpunit/phpunit.php" $ARGS 2>&1 | less -R
+  sudo -u www-data eatmydata php "${WSL_CORE}/tests/phpunit/phpunit.php" $ARGS 2>&1 | less -R
 )
