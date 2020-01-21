@@ -78,8 +78,7 @@ reset_ext_repo() {
   local BASEPATH=$1
 	local PROJECT=$2
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-    git remote set-url origin "https://gerrit.wikimedia.org/r/p/${BASEPATH}${PROJECT}.git"
-    git remote set-url gerrit "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
+    git remote set-url origin "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
 		timeout 60 git remote update && git checkout master
 	fi
 }
