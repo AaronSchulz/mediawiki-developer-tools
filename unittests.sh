@@ -1,6 +1,6 @@
 #!/bin/bash
 ARGS="$@"
-./sync.sh
+sudo ./sync.sh
 (
   WSL_CORE="/srv/mediawiki/core";
   # Use Git for Windows git for the WIN10 path
