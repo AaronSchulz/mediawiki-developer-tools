@@ -1,11 +1,16 @@
 #!/bin/bash
 
 # Config
-basePath="mediawiki/extensions/"
+base_dir="mediawiki/extensions/"
 threads=4
 operation=$1
 summary=$2
-
+# Support ~/git exe that uses /usr/bin/git or git.exe based on path
+if [ -x ~/git ]; then
+  git_bin=~/git
+else
+  git_bin=git
+fi
 # Sanity check the working directory to avoid making git checkout spam
 # Note: this handles the case where the bash script is a symlink to the git repo version
 REALPATH=$(pwd -P)
@@ -27,18 +32,17 @@ rem_trailing_slash() {
 pull_ext_repo() {
 	local PROJECT=$1
 	if [ ! -d "${PROJECT}" ]; then
-		timeout 60 git clone "ssh://gerrit.wikimedia.org:29418/${basePath}${PROJECT}" && \
+		timeout 60 $git_bin clone "ssh://gerrit.wikimedia.org:29418/${base_dir}${PROJECT}" && \
 		cd "${PROJECT}" && \
-		git config core.fileMode false && \
-		git checkout master && \
-		timeout 60 git submodule update --init --recursive
+		$git_bin config core.fileMode false && \
+		$git_bin checkout master && \
+		timeout 60 $git_bin submodule update --init --recursive
 	else
 		cd "${PROJECT}" && \
-		timeout 30 git fetch && \
-		git config core.fileMode false && \
-		git checkout master 2>/dev/null && \
-		git reset --hard origin/master && \
-		timeout 30 git submodule update --recursive
+		timeout 30 $git_bin remote update && \
+		$git_bin checkout master 2>/dev/null && \
+		$git_bin reset --hard origin/master && \
+		timeout 30 $git_bin submodule update --recursive
 	fi
 }
 
@@ -46,8 +50,8 @@ commit_ext_repo() {
 	local PROJECT=$1
 	local SUMMARY=$2
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-		if [ -n "$(git status --porcelain)" ]; then
-		  git commit -a -m "$SUMMARY"
+		if [ -n "$($git_bin status --porcelain)" ]; then
+		  $git_bin commit -a -m "$SUMMARY"
     fi
 	fi
 }
@@ -55,10 +59,12 @@ commit_ext_repo() {
 push_ext_repo() {
 	local PROJECT=$1
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-    local CHANGES=$(git log origin/master..HEAD)
+    local CHANGES=$($git_bin log origin/master..HEAD)
     if [ -n "${CHANGES}" ]; then
       echo $CHANGES
-      timeout 60 git remote update && git push -f && git reset --hard origin/master
+      timeout 60 $git_bin remote update && \
+      timeout 60 $git_bin push -f && \
+      $git_bin reset --hard origin/master
 		fi
 	fi
 }
@@ -66,38 +72,41 @@ push_ext_repo() {
 review_ext_repo() {
 	local PROJECT=$1
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-    local CHANGES=$(git log origin/master..HEAD)
+    local CHANGES=$($git_bin log origin/master..HEAD)
     if [ -n "${CHANGES}" ]; then
       echo $CHANGES
-      timeout 60 git remote update && git-review && git reset --hard origin/master
+      timeout 60 $git_bin remote update && \
+      timeout 60 git-review && \
+      $git_bin reset --hard origin/master
 		fi
 	fi
 }
 
 reset_ext_repo() {
-  local BASEPATH=$1
-	local PROJECT=$2
+	local PROJECT=$1
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
-    git remote set-url origin "ssh://gerrit.wikimedia.org:29418/${BASEPATH}${PROJECT}.git"
-		timeout 60 git remote update && git checkout master
+		$git_bin config core.fileMode false && \
+    $git_bin remote set-url origin "ssh://gerrit.wikimedia.org:29418/${base_dir}${PROJECT}" && \
+		timeout 60 $git_bin remote update && \
+		$git_bin reset --hard && \
+		$git_bin checkout master 2>/dev/null
 	fi
 }
 
 # Script to clone any missing extensions and updates the others
 if [ -n "${GIT_ALL_WMF_ONLY}" ]; then
-  fakeBasePath='$IP/extensions/'
+  fakebase_dir='$IP/extensions/'
   echo -n "Retrieving Wikimedia-deployed MediaWiki extension list..."
   MODULES=($(curl -sL "https://raw.githubusercontent.com/wikimedia/operations-mediawiki-config/master/wmf-config/extension-list" | \
-  grep "${fakeBasePath}" | \
-  sed "s,${fakeBasePath},," | \
+  grep "${fakebase_dir}" | \
+  sed "s,${fakebase_dir},," | \
   sed "s,/.*$,,"))
   echo "done"
-  echo $MODULES
 else
   echo -n "Retrieving known MediaWiki extension list..."
   MODULES=($(curl -s "https://gerrit.wikimedia.org/r/projects/?format=text" | \
-  grep "^${basePath}" | \
-  sed "s,${basePath},,"))
+  grep "^${base_dir}" | \
+  sed "s,${base_dir},,"))
   echo "done"
 fi
 
@@ -120,8 +129,7 @@ for PROJECT in "${MODULES[@]}"; do
     elif [ "$operation" == "review" ]; then
         info=$(review_ext_repo "${PROJECT}")
     elif [ "$operation" == "reset" ]; then
-        echo "${basePath}" "${PROJECT}"
-        info=$(reset_ext_repo "${basePath}" "${PROJECT}")
+        info=$(reset_ext_repo "${PROJECT}")
     else
         echo "Invalid operation: $operation."
         exit 1
