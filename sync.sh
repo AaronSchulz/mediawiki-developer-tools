@@ -25,7 +25,7 @@ sync_project() {
   if [ -n "${SRC_GIT_MTIME}" ] && [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ]; then
     echo "${SRC} -> ${DST} (.git)"
     echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
-    rsync -dq "${SRC}/" "${DST}" && rsync -rltDoiq "${SRC}/.git/" "${DST}/.git"
+    rsync -dq "${SRC}/" "${DST}" && rsync -rltDiq "${SRC}/.git/" "${DST}/.git"
 
     (
       cd "${DST}" || exit 1
@@ -46,14 +46,14 @@ sync_project() {
   if [ -n "${SRC_VENDOR_MTIME}" ] && [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
     echo "${SRC} -> ${DST} (vendor)"
     echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
-    rsync -rltDoiq "${SRC}/vendor/" "${DST}/vendor" &&
+    rsync -rltDiq "${SRC}/vendor/" "${DST}/vendor" &&
     touch -m --date="${SRC_VENDOR_MTIME}" "${DST}/vendor"
   fi
 
   if [ -n "${SRC_NODE_MTIME}" ] && [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
     echo "${SRC} -> ${DST} (node_modules)"
     echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
-    rsync -rltDoiq "${SRC}/node_modules/" "${DST}/node_modules" &&
+    rsync -rltDiq "${SRC}/node_modules/" "${DST}/node_modules" &&
     touch -m --date="${SRC_NODE_MTIME}" "${DST}/node_modules"
   fi
 }
@@ -102,7 +102,7 @@ fi
 rsync -dq "${W10_CORE}/extensions/" "${WSL_CORE}/extensions"
 sync_subprojects "${W10_CORE}/extensions" "${WSL_CORE}/extensions" "${EXTENSION_NAMES[@]}" &
 
-rsync -rltDoiq --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
+rsync -rltDiq --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
 
 wait
 exit
