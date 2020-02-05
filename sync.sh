@@ -2,7 +2,8 @@
 
 W10_USER=$(/mnt/c/WINDOWS/system32/whoami.exe | grep -Po '[^\\]+$' | tr -d '\r')
 W10_CORE="/mnt/c/Users/${W10_USER}/PhpstormProjects/wsl_core"
-WSL_CORE="/srv/mediawiki/core";
+WSL_CORE="/srv/mediawiki/core"
+WWW_USER="www-data"
 CATEGORY=$1
 
 sync_project() {
@@ -25,7 +26,8 @@ sync_project() {
   if [ -n "${SRC_GIT_MTIME}" ] && [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ]; then
     echo "${SRC} -> ${DST} (.git)"
     echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
-    rsync -dq "${SRC}/" "${DST}" && rsync -rltDiq "${SRC}/.git/" "${DST}/.git"
+    rsync -dq --chown "${WWW_USER}" "${SRC}/" "${DST}" &&
+    rsync -rltDiq --chown "${WWW_USER}" "${SRC}/.git/" "${DST}/.git"
 
     (
       cd "${DST}" || exit 1
@@ -40,21 +42,21 @@ sync_project() {
     ) || return 1
 
     # Mark git/working directory as updated
-    touch -m --date="${SRC_GIT_MTIME}" "${DST}/.git/index"
+    touch -m --date "${SRC_GIT_MTIME}" "${DST}/.git/index"
   fi
 
   if [ -n "${SRC_VENDOR_MTIME}" ] && [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
     echo "${SRC} -> ${DST} (vendor)"
     echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
-    rsync -rltDiq "${SRC}/vendor/" "${DST}/vendor" &&
-    touch -m --date="${SRC_VENDOR_MTIME}" "${DST}/vendor"
+    rsync -rltDiq --chown "${WWW_USER}" "${SRC}/vendor/" "${DST}/vendor" &&
+    touch -m --date "${SRC_VENDOR_MTIME}" "${DST}/vendor"
   fi
 
   if [ -n "${SRC_NODE_MTIME}" ] && [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
     echo "${SRC} -> ${DST} (node_modules)"
     echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
-    rsync -rltDiq "${SRC}/node_modules/" "${DST}/node_modules" &&
-    touch -m --date="${SRC_NODE_MTIME}" "${DST}/node_modules"
+    rsync -rltDiq --chown "${WWW_USER}" "${SRC}/node_modules/" "${DST}/node_modules" &&
+    touch -m --date "${SRC_NODE_MTIME}" "${DST}/node_modules"
   fi
 }
 
@@ -79,8 +81,7 @@ sync_subprojects() {
 trap "wait && exit" INT
 
 sync_project "${W10_CORE}" "${WSL_CORE}" &
-
-rsync -dq "${W10_CORE}/skins/" "${WSL_CORE}/skins"
+rsync -dq --chown "${WWW_USER}" "${W10_CORE}/skins/" "${WSL_CORE}/skins"
 SKIN_NAMES=($(find "${W10_CORE}/skins/"* -maxdepth 0 -type d -printf "%f\n"))
 sync_subprojects "${W10_CORE}/skins" "${WSL_CORE}/skins" "${SKIN_NAMES[@]}" &
 
@@ -99,10 +100,10 @@ if [ "$CATEGORY" == "wmf" ]; then
 else
   EXTENSION_NAMES=($(find "${W10_CORE}/extensions/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
-rsync -dq "${W10_CORE}/extensions/" "${WSL_CORE}/extensions"
+rsync -dq --chown "${WWW_USER}" "${W10_CORE}/extensions/" "${WSL_CORE}/extensions"
 sync_subprojects "${W10_CORE}/extensions" "${WSL_CORE}/extensions" "${EXTENSION_NAMES[@]}" &
 
-rsync -rltDiq --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/" &
+rsync -rltDiq --include '*Settings.php' --exclude '*' --chown "${WWW_USER}" "${W10_CORE}/" "${WSL_CORE}/" &
 
 wait
 exit
