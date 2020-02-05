@@ -2,6 +2,7 @@
 
 # Config
 base_dir="mediawiki/extensions/"
+gitiles_url="https://gerrit.wikimedia.org/r/plugins/gitiles"
 threads=4
 operation=$1
 summary=$2
@@ -32,6 +33,15 @@ rem_trailing_slash() {
 pull_ext_repo() {
 	local PROJECT=$1
 	if [ ! -d "${PROJECT}" ]; then
+	  if \
+	    wget -q --method=HEAD "${gitiles_url}/${base_dir}${PROJECT}/+/master/OBSOLETE" || \
+	    wget -q --method=HEAD "${gitiles_url}/${base_dir}${PROJECT}/+/master/OBSOLETE.txt"
+	  then
+	    echo "Marking ${PROJECT} as ignored"
+	    mkdir "${PROJECT}" && echo -n > "${PROJECT}/IGNORE"
+	    exit 0
+    fi
+
 		timeout 60 $git_bin clone "ssh://gerrit.wikimedia.org:29418/${base_dir}${PROJECT}" && \
 		cd "${PROJECT}" && \
 		$git_bin config core.fileMode false && \
@@ -87,9 +97,13 @@ reset_ext_repo() {
 	if [ -d "${PROJECT}" ] && cd "${PROJECT}"; then
 		$git_bin config core.fileMode false && \
     $git_bin remote set-url origin "ssh://gerrit.wikimedia.org:29418/${base_dir}${PROJECT}" && \
-		timeout 60 $git_bin remote update && \
 		$git_bin reset --hard && \
 		$git_bin checkout master 2>/dev/null
+
+		if [ -f "./OBSOLETE" ] || [ -f "./OBSOLETE.txt" ]; then
+	    echo "Marking ${PROJECT} as ignored"
+	    rm -rf ./* && echo -n > "./IGNORE"
+    fi
 	fi
 }
 
@@ -114,33 +128,32 @@ subprocs=0
 for PROJECT in "${MODULES[@]}"; do
     (
     PROJECT=$(rem_trailing_slash "${PROJECT}")
-
     if [ -f "${PROJECT}/IGNORE" ]; then
-        echo "Skipping ${PROJECT}"
-        continue
+      echo "Skipping ${PROJECT}"
+      continue
     fi
 
     if [ "$operation" == "pull" ]; then
-        info=$(pull_ext_repo "${PROJECT}")
+      info=$(pull_ext_repo "${PROJECT}")
     elif [ "$operation" == "commit" ]; then
-        info=$(commit_ext_repo "${PROJECT}" "${summary}")
+      info=$(commit_ext_repo "${PROJECT}" "${summary}")
     elif [ "$operation" == "push" ]; then
-        info=$(push_ext_repo "${PROJECT}")
+      info=$(push_ext_repo "${PROJECT}")
     elif [ "$operation" == "review" ]; then
-        info=$(review_ext_repo "${PROJECT}")
+      info=$(review_ext_repo "${PROJECT}")
     elif [ "$operation" == "reset" ]; then
-        info=$(reset_ext_repo "${PROJECT}")
+      info=$(reset_ext_repo "${PROJECT}")
     else
-        echo "Invalid operation: $operation."
-        exit 1
+      echo "Invalid operation: $operation."
+      exit 1
     fi
 
-	if [ $? -eq 0 ]; then
-		echo "${PROJECT}: OK"
-	else
-		echo "${PROJECT}: FAILED ($?): $info"
-	fi
-	) &
+    if [ $? -eq 0 ]; then
+      echo "${PROJECT}: OK"
+    else
+      echo "${PROJECT}: FAILED ($?): $info"
+    fi
+	  ) &
 
     subprocs=$((subprocs + 1));
     if [ ${subprocs} -ge ${threads} ]; then

@@ -16,5 +16,4 @@ if [ ! -d "/tmp/mw-temp-sql" ]; then
   sudo mount -t tmpfs -o size=512m tmpfs /tmp/mw-temp-sql
 fi
 
-sudo ./sync.sh &&
 sudo -u www-data php "${WSL_CORE}/tests/phpunit/phpunit.php" $ARGS 2>&1 | less -R

@@ -1,27 +1,29 @@
 #!/bin/bash
 
 W10_USER=$(/mnt/c/WINDOWS/system32/whoami.exe | grep -Po '[^\\]+$' | tr -d '\r')
-W10_CORE="/mnt/c/Users/${W10_USER}/PhpstormProjects/wsl_core"
-WSL_CORE="/srv/mediawiki/core"
 WWW_USER="www-data"
+
+W10_MEDIAWIKI="/mnt/c/Users/${W10_USER}/PhpstormProjects/mediawiki"
+WSL_MEDIAWIKI="/srv/mediawiki"
+W10_CORE="${W10_MEDIAWIKI}/core"
+WSL_CORE="${WSL_MEDIAWIKI}/core"
+W10_SKINS="${W10_MEDIAWIKI}/skins"
+WSL_SKINS="${WSL_MEDIAWIKI}/skins"
+W10_EXTENSIONS="${W10_MEDIAWIKI}/extensions"
+WSL_EXTENSIONS="${WSL_MEDIAWIKI}/extensions"
+
 CATEGORY=$1
 
 sync_project() {
   local SRC=$1
   local DST=$2
 
-  SAVEIFS=$IFS
-  IFS=$'\n'
-  local MTIMES=($(stat -c %y "${SRC}/.git/index" "${DST}/.git/index"  2>/dev/null))
-  local SRC_GIT_MTIME=${MTIMES[0]}
-  local DST_GIT_MTIME=${MTIMES[1]}
-  local MTIMES=($(stat -c %y "${SRC}/vendor" "${DST}/vendor" 2>/dev/null))
-  local SRC_VENDOR_MTIME=${MTIMES[0]}
-  local DST_VENDOR_MTIME=${MTIMES[1]}
-  local MTIMES=($(stat -c %y "${SRC}/node_modules" "${DST}/node_modules" 2>/dev/null))
-  local SRC_NODE_MTIME=${MTIMES[0]}
-  local DST_NODE_MTIME=${MTIMES[1]}
-  IFS=$SAVEIFS
+  local SRC_GIT_MTIME=$(stat -c %y "${SRC}/.git/index" 2>/dev/null)
+  local DST_GIT_MTIME=$(stat -c %y "${DST}/.git/index" 2>/dev/null)
+  local SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
+  local DST_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
+  local SRC_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
+  local DST_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
 
   if [ -n "${SRC_GIT_MTIME}" ] && [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ]; then
     echo "${SRC} -> ${DST} (.git)"
@@ -31,13 +33,14 @@ sync_project() {
 
     (
       cd "${DST}" || exit 1
-      if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+      local DIFFERENCE="$(sudo -u "${WWW_USER}" git status --porcelain --untracked-files=no)"
+      if [ -n "${DIFFERENCE}" ]; then
         echo "${SRC} -> ${DST} (checkout)"
-        git status --porcelain --untracked-files=no
+        echo "${DIFFERENCE}"
         # Reset working directory to git HEAD
-        git reset --hard 1>/dev/null &&
+        sudo -u "${WWW_USER}" git reset --hard 1>/dev/null &&
         # Purge excess files (ignoring composer/npm and dirs with a .git dir)
-        git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' --exclude='*Settings.php' 1>/dev/null
+        sudo -u "${WWW_USER}" git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' --exclude='*Settings.php' 1>/dev/null
       fi
     ) || return 1
 
@@ -80,13 +83,19 @@ sync_subprojects() {
 
 trap "wait && exit" INT
 
-sync_project "${W10_CORE}" "${WSL_CORE}" &
-rsync -dq --chown "${WWW_USER}" "${W10_CORE}/skins/" "${WSL_CORE}/skins"
-SKIN_NAMES=($(find "${W10_CORE}/skins/"* -maxdepth 0 -type d -printf "%f\n"))
-sync_subprojects "${W10_CORE}/skins" "${WSL_CORE}/skins" "${SKIN_NAMES[@]}" &
+(
+sync_project "${W10_CORE}" "${WSL_CORE}" &&
+rsync -rltDiq --include '*Settings.php' --exclude '*' --chown "${WWW_USER}" "${W10_CORE}/" "${WSL_CORE}/"
+) &
+
+SKIN_NAMES=($(find "${W10_SKINS}/"* -maxdepth 0 -type d -printf "%f\n"))
+(
+rsync -dq --chown "${WWW_USER}" "${W10_SKINS}/" "${WSL_SKINS}" &&
+sync_subprojects "${W10_SKINS}" "${WSL_SKINS}" "${SKIN_NAMES[@]}"
+) &
 
 if [ "$CATEGORY" == "wmf" ]; then
-  CACHE_FILE="${W10_CORE}/extensions/.wmf-extensions.list.cache"
+  CACHE_FILE="${W10_EXTENSIONS}/.wmf-extensions.list.cache"
   if ! test `find "${CACHE_FILE}" -mmin -86400`; then
     echo -n "Retrieving Wikimedia-deployed MediaWiki extension list..."
     PATH_PREFIX='$IP/extensions/'
@@ -98,12 +107,12 @@ if [ "$CATEGORY" == "wmf" ]; then
   fi
   EXTENSION_NAMES=($(cat "${CACHE_FILE}"))
 else
-  EXTENSION_NAMES=($(find "${W10_CORE}/extensions/"* -maxdepth 0 -type d -printf "%f\n"))
+  EXTENSION_NAMES=($(find "${W10_EXTENSIONS}/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
-rsync -dq --chown "${WWW_USER}" "${W10_CORE}/extensions/" "${WSL_CORE}/extensions"
-sync_subprojects "${W10_CORE}/extensions" "${WSL_CORE}/extensions" "${EXTENSION_NAMES[@]}" &
-
-rsync -rltDiq --include '*Settings.php' --exclude '*' --chown "${WWW_USER}" "${W10_CORE}/" "${WSL_CORE}/" &
+(
+rsync -dq --chown "${WWW_USER}" "${W10_EXTENSIONS}/" "${WSL_EXTENSIONS}" &&
+sync_subprojects "${W10_EXTENSIONS}" "${WSL_EXTENSIONS}" "${EXTENSION_NAMES[@]}"
+) &
 
 wait
 exit
