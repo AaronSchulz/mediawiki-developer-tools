@@ -37,6 +37,8 @@ sync_project() {
       if [ -n "${DIFFERENCE}" ]; then
         echo "${SRC} -> ${DST} (checkout)"
         echo "${DIFFERENCE}"
+        # Set owner/permissions
+        sudo chown -R "${WWW_USER}" .
         # Reset working directory to git HEAD
         sudo -u "${WWW_USER}" git reset --hard 1>/dev/null &&
         # Purge excess files (ignoring composer/npm and dirs with a .git dir)
