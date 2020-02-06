@@ -5,4 +5,4 @@ if [ ! -f .wmf-extensions.list.cache ]; then
 fi
 
 DIRS=($(cat .wmf-extensions.list.cache))
-for DIR in "${DIRS[@]}"; do grep -r "$@" "/srv/mediawiki/extensions/${DIR}"; done
+for DIR in "${DIRS[@]}"; do grep -r --exclude-dir=".git" "$@" "/srv/mediawiki/extensions/${DIR}"; done
