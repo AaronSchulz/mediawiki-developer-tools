@@ -20,46 +20,50 @@ sync_project() {
 
   local SRC_GIT_MTIME=$(stat -c %y "${SRC}/.git/index" 2>/dev/null)
   local DST_GIT_MTIME=$(stat -c %y "${DST}/.git/index" 2>/dev/null)
-  local SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
-  local DST_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
-  local SRC_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
-  local DST_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
 
   if [ -n "${SRC_GIT_MTIME}" ] && [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ]; then
     echo "${SRC} -> ${DST} (.git)"
     echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
-    sudo -u "${WWW_USER}" rsync -dq --chown "${WWW_USER}" "${SRC}/" "${DST}" &&
-    sudo -u "${WWW_USER}" rsync -rltDiq --chown "${WWW_USER}" "${SRC}/.git/" "${DST}/.git"
+    sudo -u "${WWW_USER}" rsync -dq "${SRC}/" "${DST}" &&
+    sudo -u "${WWW_USER}" rsync -rltDiq "${SRC}/.git/" "${DST}/.git"
 
     (
       cd "${DST}" || exit 1
-      local DIFFERENCE="$(sudo -u "${WWW_USER}" git status --porcelain --untracked-files=no)"
-      if [ -n "${DIFFERENCE}" ]; then
+      local CHANGES="$(sudo -u "${WWW_USER}" -H git status --porcelain --untracked-files=no)"
+      if [ -n "${CHANGES}" ]; then
         echo "${SRC} -> ${DST} (checkout)"
-        echo "${DIFFERENCE}"
+        echo "${CHANGES}"
         # Reset working directory to git HEAD
-        sudo -u "${WWW_USER}" git reset --hard 1>/dev/null &&
+        sudo -u "${WWW_USER}" -H git reset --hard 1>/dev/null &&
         # Purge excess files (ignoring composer/npm and dirs with a .git dir)
-        sudo -u "${WWW_USER}" git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' --exclude='*Settings.php' 1>/dev/null
+        sudo -u "${WWW_USER}" -H git clean -xfd --exclude='vendor/**' --exclude='node_modules/**' --exclude='*Settings.php' 1>/dev/null
       fi
     ) || return 1
 
     # Mark git/working directory as updated
-    touch -m --date "${SRC_GIT_MTIME}" "${DST}/.git/index"
+    sudo -u "${WWW_USER}" touch -m --date "${SRC_GIT_MTIME}" "${DST}/.git/index"
   fi
 
-  if [ -n "${SRC_VENDOR_MTIME}" ] && [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
-    echo "${SRC} -> ${DST} (vendor)"
-    echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
-    sudo -u "${WWW_USER}" rsync -rltDiq --chown "${WWW_USER}" "${SRC}/vendor/" "${DST}/vendor" &&
-    touch -m --date "${SRC_VENDOR_MTIME}" "${DST}/vendor"
+  local SRC_VENDOR_MTIME=$(stat -c %y "${SRC}/vendor" 2>/dev/null)
+  if [ -n "${SRC_VENDOR_MTIME}" ]; then
+    local DST_VENDOR_MTIME=$(stat -c %y "${DST}/vendor" 2>/dev/null)
+    if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
+      echo "${SRC} -> ${DST} (vendor)"
+      echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
+      sudo -u "${WWW_USER}" rsync -rltDiq "${SRC}/vendor/" "${DST}/vendor" &&
+      sudo -u "${WWW_USER}" touch -m --date "${SRC_VENDOR_MTIME}" "${DST}/vendor"
+    fi
   fi
 
-  if [ -n "${SRC_NODE_MTIME}" ] && [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
-    echo "${SRC} -> ${DST} (node_modules)"
-    echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
-    sudo -u "${WWW_USER}" rsync -rltDiq --chown "${WWW_USER}" "${SRC}/node_modules/" "${DST}/node_modules" &&
-    touch -m --date "${SRC_NODE_MTIME}" "${DST}/node_modules"
+  local SRC_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
+  if [ -n "${SRC_NODE_MTIME}" ]; then
+    local DST_NODE_MTIME=$(stat -c %y "${SRC}/node_modules" 2>/dev/null)
+    if [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
+      echo "${SRC} -> ${DST} (node_modules)"
+      echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
+      sudo -u "${WWW_USER}" rsync -rltDiq "${SRC}/node_modules/" "${DST}/node_modules" &&
+      sudo -u "${WWW_USER}" touch -m --date "${SRC_NODE_MTIME}" "${DST}/node_modules"
+    fi
   fi
 }
 
@@ -85,12 +89,12 @@ trap "wait && exit" INT
 
 (
 sync_project "${W10_CORE}" "${WSL_CORE}" &&
-sudo -u "${WWW_USER}" rsync -rltDiq --include '*Settings.php' --exclude '*' --chown "${WWW_USER}" "${W10_CORE}/" "${WSL_CORE}/"
+sudo -u "${WWW_USER}" rsync -rltDiq --include '*Settings.php' --exclude '*' "${W10_CORE}/" "${WSL_CORE}/"
 ) &
 
 SKIN_NAMES=($(find "${W10_SKINS}/"* -maxdepth 0 -type d -printf "%f\n"))
 (
-sudo -u "${WWW_USER}" rsync -dq --chown "${WWW_USER}" "${W10_SKINS}/" "${WSL_SKINS}" &&
+sudo -u "${WWW_USER}" rsync -dq "${W10_SKINS}/" "${WSL_SKINS}" &&
 sync_subprojects "${W10_SKINS}" "${WSL_SKINS}" "${SKIN_NAMES[@]}"
 ) &
 
@@ -110,7 +114,7 @@ else
   EXTENSION_NAMES=($(find "${W10_EXTENSIONS}/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
 (
-sudo -u "${WWW_USER}" rsync -dq --chown "${WWW_USER}" "${W10_EXTENSIONS}/" "${WSL_EXTENSIONS}" &&
+sudo -u "${WWW_USER}" rsync -dq "${W10_EXTENSIONS}/" "${WSL_EXTENSIONS}" &&
 sync_subprojects "${W10_EXTENSIONS}" "${WSL_EXTENSIONS}" "${EXTENSION_NAMES[@]}"
 ) &
 
