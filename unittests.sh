@@ -2,9 +2,10 @@
 
 ARGS="$@"
 WSL_CORE="/srv/mediawiki/core"
+GIT_BIN="~/bin/git"
 
 # Use Git for Windows git for the WIN10 path
-CHANGES=$(git.exe diff --name-only)
+CHANGES=$($GIT_BIN diff --name-only)
 if [ -n "${CHANGES}" ]; then
   echo "The following core file(s) have uncommitted changes in git:"
   echo "${CHANGES}"
