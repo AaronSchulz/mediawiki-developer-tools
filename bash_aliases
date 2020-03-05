@@ -15,7 +15,7 @@ function yubireset() {
 alias fast_git='~/bin/git'
 alias gdiff='fast_git diff -U20 --color=always'
 alias gvdiff='fast_git difftool -yd --color=always'
-alias gshow='fast_git diff -U20 --color=always'
+alias gshow='fast_git show -U20 --color=always'
 alias gvlastdiff='fast_git difftool -yd --color=always HEAD^1..HEAD'
 alias gstatus='fast_git status'
 alias glog='fast_git log --dirstat --decorate --color=always'
