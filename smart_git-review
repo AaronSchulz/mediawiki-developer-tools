@@ -1,8 +1,9 @@
 #!/bin/bash
 if [[ $(realpath "$PWD") == /mnt/c/* ]]; then
-  GIT_REVIEW_PATH_W10=$(which git-review.exe)
-  if [ -n "${GIT_REVIEW_PATH_W10}" ]; then
-	  "${GIT_REVIEW_PATH_W10}" "$@"
+  WHERE_PATH=$(/mnt/c/Windows/System32/where.exe git-review)
+  if [ "$?" -eq 0 ]; then
+    GIT_REVIEW_PATH_W10=$(wslpath -a "${WHERE_PATH}" | sed 's/\r*$//g')
+	  $GIT_REVIEW_PATH_W10 "$@"
 	else
 	  /usr/bin/git-review "$@"
 	fi
