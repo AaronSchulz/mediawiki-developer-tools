@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Use fast RAM-disk for Sqlite
-if [ ! -d "/tmp/mw-temp-sql" ]; then
+if ! grep -qs '/tmp/mw-temp-sql ' /proc/mounts; then
   sudo mount -t tmpfs -o size=512m tmpfs /tmp/mw-temp-sql
 fi
 

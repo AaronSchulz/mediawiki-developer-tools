@@ -110,6 +110,8 @@ if [ "$CATEGORY" == "wmf" ]; then
     echo "done"
   fi
   EXTENSION_NAMES=($(cat "${CACHE_FILE}"))
+elif [ "$CATEGORY" == "core" ]; then
+  EXTENSION_NAMES=()
 else
   EXTENSION_NAMES=($(find "${W10_EXTENSIONS}/"* -maxdepth 0 -type d -printf "%f\n"))
 fi
