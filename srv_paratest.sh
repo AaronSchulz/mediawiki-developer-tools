@@ -25,8 +25,8 @@ sudo -u www-data cp "${BASE_DIR}/mw_core_suite.xml" /srv/mediawiki/core/tests/ph
 (
 	cd /srv/mediawiki/core &&
 	sudo -u www-data ~/.config/composer/vendor/bin/paratest \
-  --phpunit /srv/mediawiki/core/tests/phpunit/phpunit.php \
-  --configuration /srv/mediawiki/core/tests/phpunit/mw_core_suite.xml \
+  --phpunit tests/phpunit/phpunit.php \
+  --configuration tests/phpunit/mw_core_suite.xml \
   --bootstrap "${BASE_DIR}/dummy.php" \
   --parallel-suite \
   --colors \
