@@ -22,6 +22,12 @@
 		<testsuite name="includes-block">
 			<directory>includes/block</directory>
 		</testsuite>
+		<testsuite name="includes-cache">
+			<directory>includes/cache</directory>
+		</testsuite>
+		<testsuite name="includes-changetags">
+			<directory>includes/changetags</directory>
+		</testsuite>
 		<testsuite name="includes-content">
 			<directory>includes/content</directory>
 		</testsuite>
@@ -99,6 +105,8 @@
 			<exclude>includes/api</exclude>
 			<exclude>includes/auth</exclude>
 			<exclude>includes/block</exclude>
+			<exclude>includes/cache</exclude>
+			<exclude>includes/changetags</exclude>
 			<exclude>includes/content</exclude>
 			<exclude>includes/db</exclude>
 			<exclude>includes/deferred</exclude>
@@ -158,6 +166,9 @@
 		</testsuite>
 		<testsuite name="unit">
 			<directory>unit</directory>
+		</testsuite>
+		<testsuite name="integration">
+			<directory>integration</directory>
 		</testsuite>
 	</testsuites>
 	<groups>

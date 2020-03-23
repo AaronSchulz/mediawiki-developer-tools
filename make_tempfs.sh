@@ -9,10 +9,21 @@
 #	  $wgDBservers[0]['variables']['synchronous'] = 'OFF';
 #}
 
+TEMP_RAM_DIR=$1
+
+if [ -z "${TEMP_RAM_DIR}" ]; then
+  echo "Missing temp directory mount path"
+  exit 1
+fi
+
 # Use fast RAM-disk for Sqlite
-if ! grep -qs '/tmp/mw-temp ' /proc/mounts; then
-  if [ ! -d /tmp/mw-temp ]; then
-    sudo -u www-data mkdir '/tmp/mw-temp' -m 744
+if [ -d "${TEMP_RAM_DIR}" ]; then
+  if grep -qs " ${TEMP_RAM_DIR} " /proc/mounts; then
+    echo "Clearing tmpfs mount at '${TEMP_RAM_DIR}'"
+    sudo -u www-data rm -rf "${TEMP_RAM_DIR}"/*
+  else
+    echo "Mounting tmpfs at '${TEMP_RAM_DIR}'"
+    sudo mount -t tmpfs -o size=512m tmpfs "${TEMP_RAM_DIR}"
+    sudo chown www-data:www-data "${TEMP_RAM_DIR}"
   fi
-  sudo mount -t tmpfs -o size=512m tmpfs /tmp/mw-temp
 fi

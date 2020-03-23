@@ -13,10 +13,13 @@ if [ -n "${CHANGES}" ]; then
   exit 1
 fi
 
+# Sync code
 "${BASE_DIR}/sync.sh" core
-"${BASE_DIR}/make_tempfs.sh"
+
+# Create/cleanup temp directory
+"${BASE_DIR}/make_tempfs.sh" /mw-temp
 
 (
   cd "${WSL_CORE}" &&
-  sudo -u www-data php "${WSL_CORE}/tests/phpunit/phpunit.php" $ARGS 2>&1 | less -R
+  sudo TMPDIR="/mw-temp" -u www-data php "${WSL_CORE}/tests/phpunit/phpunit.php" $ARGS 2>&1 | less -R
 )
