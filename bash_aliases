@@ -37,4 +37,5 @@ alias grdownload='smart_git-review -d $1'
 
 alias grep='grep --exclude-dir=".git"'
 
-alias wphp='sudo -u www-data php'
+alias wphp='sudo -u www-data php -d opcache.file_cache=/opcache/php7 -d opcache.file_cache_only=1'
+alias wphp8='sudo -u www-data /home/aaron/bin/php8 php -d opcache.file_cache=/opcache/php8 -d opcache.file_cache_only=1'

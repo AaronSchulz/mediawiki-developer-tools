@@ -24,7 +24,7 @@ sudo -u www-data cp "${BASE_DIR}/mw_core_suite.xml" /srv/mediawiki/core/tests/ph
 
 (
 	cd /srv/mediawiki/core &&
-	sudo TMPDIR="/mw-temp" -u www-data ~/.config/composer/vendor/bin/paratest \
+	sudo TMPDIR="/mw-temp" -u www-data paratest \
   --phpunit tests/phpunit/phpunit.php \
   --configuration tests/phpunit/mw_core_suite.xml \
   --bootstrap "${BASE_DIR}/dummy.php" \
