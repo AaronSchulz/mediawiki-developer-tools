@@ -39,3 +39,19 @@ alias grep='grep --exclude-dir=".git"'
 
 alias wphp='sudo -u www-data php -d opcache.file_cache=/opcache/php7 -d opcache.file_cache_only=1'
 alias wphp8='sudo -u www-data /home/aaron/bin/php8 php -d opcache.file_cache=/opcache/php8 -d opcache.file_cache_only=1'
+
+alias winwhere="/mnt/c/Windows/System32/where.exe"
+
+# Convenience common editors
+function pnotepad {
+	WSLPATH=$(wslpath -w "$1")
+	/mnt/c/Program\ Files\ \(x86\)/Programmer\'s\ Notepad/pn.exe "$WSLPATH"
+}
+function komodoedit {
+	WSLPATH=$(wslpath -w "$1")
+	/mnt/c/Program\ Files\ \(x86\)/ActiveState\ Komodo\ Edit\ 12/komodo.exe "$WSLPATH"
+}
+function notepadpp {
+	WSLPATH=$(wslpath -w "$1")
+	/mnt/c/Program\ Files\ \(x86\)/Notepad++/notepad++.exe "$WSLPATH"
+}
