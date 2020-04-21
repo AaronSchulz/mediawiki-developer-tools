@@ -1,0 +1,13 @@
+#!/bin/bash
+if [[ $(realpath "$PWD") == /mnt/c/* ]]; then
+  # Avoid having the .bat file get listed too
+  WHERE_PATH=$(/mnt/c/Windows/System32/where.exe composer.)
+  if [ "$?" -eq 0 ]; then
+    COMPOSER_PATH_W10=$(wslpath -a "${WHERE_PATH}" | sed 's/\r*$//g')
+	  $COMPOSER_PATH_W10 "$@"
+	else
+	  /usr/bin/composer "$@"
+	fi
+else
+	/usr/bin/composer "$@"
+fi
