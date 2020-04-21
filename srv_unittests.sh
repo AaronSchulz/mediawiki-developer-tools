@@ -14,10 +14,10 @@ if [ -n "${CHANGES}" ]; then
 fi
 
 # Sync code
-"${BASE_DIR}/sync.sh" core
+"${BASE_DIR}/sync.sh" core || exit 1
 
 # Create/cleanup temp directory
-"${BASE_DIR}/make_tempfs.sh" /mw-temp
+"${BASE_DIR}/make_tempfs.sh" /mw-temp || exit 1
 
 (
   cd "${WSL_CORE}" &&
