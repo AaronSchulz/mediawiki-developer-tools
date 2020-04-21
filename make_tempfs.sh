@@ -23,7 +23,7 @@ if [ -d "${TEMP_RAM_DIR}" ]; then
     sudo -u www-data rm -rf "${TEMP_RAM_DIR}"/*
   else
     echo "Mounting tmpfs at '${TEMP_RAM_DIR}'"
-    sudo mount -t tmpfs -o size=512m tmpfs "${TEMP_RAM_DIR}"
+    sudo mount -t tmpfs -o size=256m tmpfs "${TEMP_RAM_DIR}"
     sudo chown www-data:www-data "${TEMP_RAM_DIR}"
   fi
 fi

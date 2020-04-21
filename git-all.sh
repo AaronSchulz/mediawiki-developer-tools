@@ -126,13 +126,13 @@ fi
 
 subprocs=0
 for PROJECT in "${MODULES[@]}"; do
-    (
     PROJECT=$(rem_trailing_slash "${PROJECT}")
     if [ -f "${PROJECT}/IGNORE" ]; then
       echo "Skipping ${PROJECT}"
       continue
     fi
 
+    (
     if [ "$operation" == "pull" ]; then
       info=$(pull_ext_repo "${PROJECT}")
     elif [ "$operation" == "commit" ]; then
