@@ -21,6 +21,7 @@ fi
 
 # Work around poorly divided suites
 sudo -u www-data cp "${BASE_DIR}/mw_core_suite.xml" "${WSL_CORE}/tests/phpunit/" || exit 1
+sudo -u www-data cp "${BASE_DIR}/ParatestWrapperSettings.php" "${WSL_CORE}/" || exit 1
 
 (
 	cd /srv/mediawiki/core &&
@@ -30,5 +31,5 @@ sudo -u www-data cp "${BASE_DIR}/mw_core_suite.xml" "${WSL_CORE}/tests/phpunit/"
   --bootstrap "${BASE_DIR}/dummy.php" \
   --parallel-suite \
   --colors \
-	--passthru="${ARGS}" 2>&1 | less -R
+	--passthru="--conf ParatestWrapperSettings.php ${ARGS}" 2>&1 | less -R
 )
