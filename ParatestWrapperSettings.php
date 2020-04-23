@@ -22,20 +22,23 @@ function wfCloneSqliteSchemaForParatest( $liveDbPath, $cloneDbPath ) {
 
 // Use the temp dir for the slot assigned by paratest
 $wgTmpDirectory = wfTempDir() . '/' . getenv( 'TEST_TOKEN' );
+// Make sure the slot dir exists (entrypoint script should clear them)
 wfMkdirParents( $wgTmpDirectory );
 
 foreach ( $wgDBservers as $i => $server ) {
 	if ( $server['type'] !== 'sqlite' ) {
 		continue;
 	}
+	// Create or reuse the empty test DB for the assigned slot
 	$liveDbPath = ( $server['dbDirectory'] ?? $wgSQLiteDataDir ) . "/$wgDBname.sqlite";
 	$cloneDbPath = "$wgTmpDirectory/$wgDBname.sqlite";
-	// Create or reuse the empty test DB for the assigned slot
 	if ( !is_file( $cloneDbPath ) ) {
 		wfCloneSqliteSchemaForParatest( $liveDbPath, $cloneDbPath );
 	}
+	// Use the test DB with relaxed settings
 	$wgDBservers[$i]['dbDirectory'] = $wgTmpDirectory;
 	$wgDBservers[$i]['variables']['temp_store'] = 'MEMORY';
+	$wgDBservers[$i]['variables']['synchronous'] = 'OFF';
 }
 
 // Avoid sharing certain resources among concurrent threads
