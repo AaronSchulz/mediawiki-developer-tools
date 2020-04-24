@@ -1,0 +1,3 @@
+#!/bin/sh
+EXE_PATH=$(/mnt/c/Windows/System32/where.exe "$@" | head -n 1)
+wslpath -a "$EXE_PATH"

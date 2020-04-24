@@ -1,0 +1,6 @@
+#!/bin/bash
+if [[ $(realpath "$PWD") == /mnt/c/* ]]; then
+	"/mnt/c/Program Files/Git/usr/bin/stat.exe" "$@"
+else
+	/usr/bin/stat "$@"
+fi
