@@ -46,20 +46,19 @@ function sync_project_code() {
 			exit 1
 		fi
 	elif [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ]; then
-		echo "${SRC} -> ${DST} (.git)"
-		echo "Source: ${SRC_GIT_MTIME}; Destination: ${DST_GIT_MTIME}"
+		echo "Git repo: ${DST} (@${DST_GIT_MTIME} -> @${SRC_GIT_MTIME})"
 		sudo -u "${WWW_USER}" rsync -dq "${SRC}/" "${DST}" || exit 1
 		sudo -u "${WWW_USER}" rsync -rltDiq "${SRC}/.git/" "${DST}/.git" || exit 1
 
-		# Synchronize the destination using git commands
+		# Synchronize the destination using Git commands
 		(
 			local CHANGES
 			cd "${DST}" || exit 1
-			CHANGES="$(sudo -u "${WWW_USER}" -H git status --porcelain --untracked-files=no)"
+			CHANGES="$(sudo -u "${WWW_USER}" -H git status -s --porcelain --untracked-files=no)"
 			if [ -n "${CHANGES}" ]; then
 				echo "${SRC} -> ${DST} (checkout)"
 				echo "${CHANGES}"
-				# Reset working directory to git HEAD
+				# Reset working directory to Git HEAD
 				sudo -u "${WWW_USER}" -H git reset --hard 1>/dev/null || exit 1
 				# Purge excess files (ignoring composer/npm and dirs with a .git dir)
 				sudo -u "${WWW_USER}" -H git clean -xfd \
@@ -72,25 +71,23 @@ function sync_project_code() {
 		sudo -u "${WWW_USER}" touch -m --date "${SRC_GIT_MTIME}" "${DST}/.git/index"
 	fi
 
-	# Synchronize composer files that are not in the git repo
+	# Synchronize composer files that are not in the Git repo
 	SRC_VENDOR_MTIME=$(stat_file_w10 "${SRC_VENDOR}")
 	if [ -n "${SRC_VENDOR_MTIME}" ]; then
 		DST_VENDOR_MTIME=$(stat_file_wsl "${DST_VENDOR}")
 		if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
-			echo "${SRC} -> ${DST} (vendor)"
-			echo "Source: ${SRC_VENDOR_MTIME}; Destination: ${DST_VENDOR_MTIME}"
+			echo "Vendor: ${DST} (@${DST_VENDOR_MTIME} -> @${SRC_VENDOR_MTIME})"
 			sudo -u "${WWW_USER}" rsync -rltDiq "${SRC_VENDOR}/" "${DST_VENDOR}" || exit 1
 			sudo -u "${WWW_USER}" touch -m --date "${SRC_VENDOR_MTIME}" "${DST_VENDOR}" || exit 1
 		fi
 	fi
 
-	# Synchronize NPM files that are not in the git repo
+	# Synchronize NPM files that are not in the Git repo
 	SRC_NODE_MTIME=$(stat_file_w10 "${SRC_NPM}")
 	if [ -n "${SRC_NODE_MTIME}" ]; then
 		DST_NODE_MTIME=$(stat_file_wsl "${DST_NPM}")
 		if [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
-			echo "${SRC} -> ${DST} (node_modules)"
-			echo "Source: ${SRC_NODE_MTIME}; Destination: ${DST_NODE_MTIME}"
+			echo "NPM: ${DST} (@${DST_NODE_MTIME} -> @${SRC_NODE_MTIME})"
 			sudo -u "${WWW_USER}" rsync -rltDiq "${SRC_NPM}/" "${DST_NPM}" || exit 1
 			sudo -u "${WWW_USER}" touch -m --date "${SRC_NODE_MTIME}" "${DST_NPM}" || exit 1
 		fi
@@ -115,10 +112,12 @@ function sync_dir_subprojects() {
 		DST_PROJECT_ROOT="${DST}/${PROJECT_NAME}"
 		sync_project_code "${SRC_PROJECT_ROOT}" "${DST_PROJECT_ROOT}" &
 		CHILD_JOB_COUNT=$((CHILD_JOB_COUNT + 1))
-		if [ ${CHILD_JOB_COUNT} -ge "${PROCESSORS}" ]; then
+		while [ "$CHILD_JOB_COUNT" -ge "$PROCESSORS" ]; do
 			wait -n
+			# Try to ropgate SIGINT upward
+			[ $! -ne 130 ] || exit $!
 			CHILD_JOB_COUNT=$(jobs -r | wc -l)
-		fi
+		done
 	done
 	wait
 }
@@ -147,7 +146,7 @@ function prestat_dir_projects() {
 	done
 
 	# Preload the last-modified timestamp for each of these source files that exist
-	while IFS="|" read -r relative_path last_modified; do
+	while IFS=$'|\n' read -r relative_path last_modified; do
 		FILE_PATH="${SRC}/${relative_path}"
 		#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
 		MTIME_CACHE_W10[$FILE_PATH]="${last_modified}"
@@ -163,7 +162,7 @@ function prestat_dir_projects() {
 		-printf "%P|%TT\n" 2>/dev/null
 	)
 	# Preload the last-modified timestamp for each of these destination files that exist
-	while IFS="|" read -r relative_path last_modified; do
+	while IFS=$'|\n' read -r relative_path last_modified; do
 		FILE_PATH="${DST}/${relative_path}"
 		#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
 		MTIME_CACHE_WSL[$FILE_PATH]="${last_modified}"
@@ -223,12 +222,14 @@ trap "wait && exit" INT
 		sync_project_config	"${W10_CORE}" "${WSL_CORE}"
 ) &
 (
+	declare -a SKIN_REPO_NAMES
 	readarray -t SKIN_REPO_NAMES < <(dir -U1 "${W10_SKINS}" | grep -v "\.")
 	sudo -u "${WWW_USER}" \
 		rsync -dq "${W10_SKINS}/" "${WSL_SKINS}" &&
 		sync_dir_subprojects "${W10_SKINS}" "${WSL_SKINS}" "${SKIN_REPO_NAMES[@]}"
 ) &
 (
+	declare -a EXTENSION_REPO_NAMES
 	readarray -t EXTENSION_REPO_NAMES < <(dir -U1 "${W10_EXTENSIONS}" | grep -v "\.")
 	sudo -u "${WWW_USER}" \
 		rsync -dq "${W10_EXTENSIONS}/" "${WSL_EXTENSIONS}" &&

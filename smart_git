@@ -1,6 +1,11 @@
 #!/bin/bash
-if [[ $(realpath "$PWD") == /mnt/c/* ]]; then
-	"/mnt/c/Program Files/Git/cmd/git.exe" "$@"
+
+REAL_PATH=$(realpath "$PWD")
+if [[ "$REAL_PATH" == /mnt/c/* ]]; then
+	if [[ "$REAL_PATH" == "$PWD" ]]; then
+		cd "$REAL_PATH" || exit 1
+	fi
+	exec "/mnt/c/Program Files/Git/cmd/git.exe" "$@"
 else
-	/usr/bin/git "$@"
+	exec /usr/bin/git "$@"
 fi
