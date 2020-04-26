@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+
+# Avoid shelling out to basename
+COMMAND="${0##*/}"
+
+# Do not try to read special linux files from a Win32 program
+HAS_SYS_FILE_ARG=0
+for ARG in "$@"; do
+	case "$ARG" in /dev/*|/proc/*|/run/*|/sys/*)
+		HAS_SYS_FILE_ARG=1
+		;;
+	esac
+done
+
+# Use the "Git for Windows" program if $PWD belongs to Windows
+# (disregard if the regexes apply to input rather than files)
+if [ ! -p /dev/stdin ] && [ "$HAS_SYS_FILE_ARG" -eq 0 ]; then
+	case "$(pwd -P)" in /mnt/[cde]/*)
+		BIN_PATH="/mnt/c/Program Files/Git/usr/bin/$COMMAND.exe"
+		[ ! -x "$BIN_PATH" ] || exec "$BIN_PATH" "$@"
+		;;
+	esac
+fi
+# Otherwise, use the Linux program (custom => distribution => pre-init utils)
+for BIN_DIR in "/usr/local/bin" "/usr/bin"; do
+    [ ! -x "$BIN_DIR/$COMMAND" ] || exec "$BIN_DIR/$COMMAND" "$@"
+done
+exec "/bin/$COMMAND" "$@"

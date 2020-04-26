@@ -21,7 +21,7 @@ function wfCloneSqliteSchemaForParatest( $liveDbPath, $cloneDbPath ) {
 }
 
 // Use the temp dir for the slot assigned by paratest
-$wgTmpDirectory = wfTempDir() . '/' . getenv( 'TEST_TOKEN' );
+$wgTmpDirectory = getenv( 'TMPDIR' ) . '/' . getenv( 'TEST_TOKEN' );
 // Make sure the slot dir exists (entrypoint script should clear them)
 wfMkdirParents( $wgTmpDirectory );
 

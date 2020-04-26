@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+
+# Avoid shelling out to basename
+COMMAND="${0##*/}"
+
+# Use the Win32 program if $PWD belongs to Windows
+case "$(pwd -P)" in /mnt/[cde]/*)
+    BASE_DIR=$(dirname $(realpath $0))
+    BIN_PATH=$("${BASE_DIR}/where_win32" "$COMMAND")
+    [ -z "$BIN_PATH" ] || exec "$BIN_PATH" "$@"
+    ;;
+esac
+# Otherwise, use the Linux program (custom => distribution => pre-init utils)
+for BIN_DIR in "/usr/local/bin" "/usr/bin"; do
+    [ ! -x "$BIN_DIR/$COMMAND" ] || exec "$BIN_DIR/$COMMAND" "$@"
+done
+exec "/bin/$COMMAND" "$@"

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+WMF_EXTS_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
+CACHE_FILE="$HOME/.WMF_MEDIAWIKI_EXTENSION_LIST"
+
+DIRECTORY=$(basename "$(pwd -P)")
+
+if [ "$DIRECTORY" != "extensions" ]; then
+	echo "This script only runs in the 'extensions' directory" >&2
+	exit 127
+fi
+
+mapfile -t REPO_NAMES_MATCH < <(
+	grep -rls --exclude-dir=".git" "$@" | \
+	grep -Po '^[^/]+' | \
+	uniq
+)
+for REPO_NAME in "${REPO_NAMES_MATCH[@]}"; do
+	OUT=$(grep -r --exclude-dir=".git" --color=always -hn "$@" "$REPO_NAME")
+	[ -z "$OUT" ] || echo -e "$REPO_NAME:\n$OUT"
+done

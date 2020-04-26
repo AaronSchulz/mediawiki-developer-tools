@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+WSL_CORE="/srv/mediawiki/core"
+BASE_DIR=$(dirname $(realpath $0))
+SCRIPT_BASENAME=$(basename "$(realpath "$0")")
+
+OPERATION=$1
+shift 1
+ARGS="$@"
+
+function print_usage() {
+    echo "Usage: ${SCRIPT_BASENAME} <dev|srv|srv_parallel>"
+}
+
+function check_working_dir_is_clean() {
+    local CHANGES
+
+    CHANGES=$(git diff --name-status)
+    [ $? -eq 0 ] || exit $?
+
+    if [ -n "${CHANGES}" ]; then
+        echo -e "Uncommitted changes in {$PWD}:\n${CHANGES}" >&2
+        exit 1
+    fi
+
+    exit 0
+}
+
+function prepare_tmpfs_temp_dir() {
+    TMPFS_DIR=$1
+
+    if [ -z "${TMPFS_DIR}" ]; then
+        echo "Missing temp directory mount path" >&2
+        exit 127
+    fi
+
+    if [ -d "${TMPFS_DIR}" ]; then
+        if grep -qs " ${TMPFS_DIR} " /proc/mounts; then
+            echo -n "Clearing tmpfs mount at '${TMPFS_DIR}'..." || exit 1
+            sudo -u www-data -H rm -rf "${TMPFS_DIR}/*" || exit 1
+        else
+            echo -n "Mounting tmpfs at '${TMPFS_DIR}'..."
+            sudo mount -t tmpfs -o size=256m tmpfs "${TMPFS_DIR}" || exit 1
+        fi
+		sudo chown www-data:www-data "${TMPFS_DIR}" || exit 1
+		echo "done"
+    fi
+}
+
+function sync_wsl_mediawiki_dir() {
+    # Make sure ~/bin/git is used for Linux/WIN32 executable selection
+    sudo -u www-data -H "${BASE_DIR}/../utils/sync-wsl-mediawiki"
+}
+
+function execute_mediawiki_phpunit() {
+    local MEDIAWIKI_DIR=$1
+    local TMPFS_DIR=$2
+    (
+        cd "$MEDIAWIKI_DIR" || exit 1
+        exec sudo TMPDIR="${TMPFS_DIR}" -u www-data \
+            php "./tests/phpunit/phpunit.php" --colors=always "${ARGS[@]}" 2>&1
+    )
+}
+
+function execute_mediawiki_paratest() {
+    local MEDIAWIKI_DIR=$1
+    local TMPFS_DIR=$2
+    (
+        cd "$MEDIAWIKI_DIR" || exit 1
+        # XXX: ugly work-around poorly divided suites
+        sudo -u www-data -H cp "${BASE_DIR}/../config/mw_core_suite.xml" "./tests/phpunit/" || exit 1
+        sudo -u www-data -H cp "${BASE_DIR}/../config/ParatestWrapperSettings.php" "./" || exit 1
+        exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H paratest \
+            --phpunit tests/phpunit/phpunit.php \
+            --configuration tests/phpunit/mw_core_suite.xml \
+            --bootstrap "${BASE_DIR}/../config/dummy.php" \
+            --parallel-suite \
+            --colors \
+            --passthru="--conf ParatestWrapperSettings.php --colors=always ${ARGS[@]}" 2>&1
+    )
+}
+
+case $OPERATION in
+"dev" | "")
+    # The development path can belong to WIN10 or Linux; just use $PWD
+    prepare_tmpfs_temp_dir "/mw-temp" || exit $?
+    execute_mediawiki_phpunit . "/mw-temp" | less -R
+    ;;
+"srv")
+    sync_wsl_mediawiki_dir || exit $?
+    prepare_tmpfs_temp_dir "/mw-temp" || exit $?
+    execute_mediawiki_phpunit "${WSL_CORE}" "/mw-temp" | less -R
+    ;;
+"srv_parallel")
+    sync_wsl_mediawiki_dir || exit $?
+    prepare_tmpfs_temp_dir "/mw-temp" || exit $?
+    execute_mediawiki_paratest "${WSL_CORE}" "/mw-temp" | less -R
+    ;;
+*)
+    echo "Invalid command: ${OPERATION}" >&2
+    print_usage
+    exit 127
+    ;;
+esac

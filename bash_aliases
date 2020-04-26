@@ -35,14 +35,20 @@ alias grpushmaster='smart_git-review -R; if [ "$?" -eq 0 ]; then git reset --har
 alias grpushprod='smart_git-review -R; if [ "$?" -eq 0 ]; then git reset --hard origin/production; fi'
 alias grdownload='smart_git-review -d $1'
 
-alias grep='grep --exclude-dir=".git"'
+# git/svn convenience
+alias grep='grep --exclude-dir=".git" --exclude-dir=".svn"'
 
+# Win32 command locator (useful if ugly W10/WSL $PATH sharing is disable)
+alias winwhere="/mnt/c/Windows/System32/where.exe"
+
+# Fast OPCache-based PHP scripts
 alias wphp='sudo -u www-data php -d opcache.file_cache=/opcache/php7 -d opcache.file_cache_only=1'
 alias wphp8='sudo -u www-data /home/aaron/bin/php8 php -d opcache.file_cache=/opcache/php8 -d opcache.file_cache_only=1'
 
-alias winwhere="/mnt/c/Windows/System32/where.exe"
+# Convenience wrapper to synchronize /srv/mediawiki with PhpStormProjects/mediawiki
+alias syncwsl="sudo -u www-data ${HOME}/bin/sync-wsl-mediawiki"
 
-# Convenience common editors
+# Convenience launchers for common editors
 function pnotepad {
 	WSLPATH=$(wslpath -w "$1")
 	/mnt/c/Program\ Files\ \(x86\)/Programmer\'s\ Notepad/pn.exe "$WSLPATH"

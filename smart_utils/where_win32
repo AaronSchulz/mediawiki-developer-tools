@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+# Systm utility for Windows
+BIN_WHERE_W10="/mnt/c/Windows/System32/where.exe"
+
+COMMAND=$1
+
+PATH_W10=$("$BIN_WHERE_W10" "$COMMAND" 2>/dev/null | sed 's/\r*$//g' | head -n 1)
+[ $? -eq 0 ] || exit $?
+[ -n "$PATH_W10" ] || exit 1
+PATH_WSL=$(wslpath -a "$PATH_W10") || exit $?
+echo "$PATH_WSL"

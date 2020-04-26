@@ -1,29 +1,27 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Config
 GERRIT_EXT_DIR="mediawiki/extensions/"
 GERRIT_SSH_URL="ssh://gerrit.wikimedia.org:29418"
 ALL_EXTS_URL="https://gerrit.wikimedia.org/r/projects/?format=text&b=master&p=mediawiki%2Fextensions%2F"
 WMF_EXTS_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
 GITTILES_URL="https://gerrit.wikimedia.org/r/plugins/gitiles"
+
+SCRIPT_BASENAME=$(basename "$(realpath "$0")")
+DIRECTORY=$(basename "$(pwd -P)")
+
 OPERATION=$1
 SUMMARY=$2
 
 # Sanity check the working directory to avoid making Git checkout spam
 # Note: this handles the case where the bash script is a symlink to the Git repo version
-REALPATH=$(pwd -P)
-DIRECTORY=$(basename "$REALPATH")
 if [ "$DIRECTORY" != "extensions" ]; then
-	echo "pull-extensions must be run from 'extensions' directory"
-	exit 1
+	echo "${SCRIPT_BASENAME} must run in the 'extensions' directory" >&2
+	exit 127
 fi
 
-declare SCRIPT_BASENAME
-SCRIPT_BASENAME=$(basename "$(realpath "$0")")
-if [ -z "${OPERATION}" ]; then
+function print_usage() {
 	echo "Usage: ${SCRIPT_BASENAME} <pull|commit|push|reset|review|reset> [message]"
-	exit 1
-fi
+}
 
 function cmd_update_remote() {
 	local REPO=$1
@@ -44,18 +42,18 @@ function repo_init_update_remote() {
 		local BYPASSED
 
 		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
-		[[ -z "${BYPASSED}" ]] || exit 0
+		[[ "${BYPASSED}" -ne 1 ]] || exit 0
 
-		echo "Initializing ${REPO} to ${REMOTE_ORIGIN_SHA1}"
+		echo "Initializing ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
 
 		mkdir -p "${REPO}"
 		cd "./${REPO}"
 		git init -q
 		git config core.fileMode false
 		git remote add origin "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
-		git remote update
+		git remote update >/dev/null
 		git checkout master -fq
-		timeout 120 git submodule update --recursive --remote
+		git submodule update --recursive --remote
 	)
 }
 
@@ -66,17 +64,17 @@ function repo_update_remote() {
 		set -e
 		local INDEX_SYNCED SALTED
 
-		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		[[ -z "${INDEX_SYNCED}" ]] || exit 0
+		ORIGIN_SYNCED=$(local_origin_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+		[[ "${ORIGIN_SYNCED}" -ne 1 ]] || exit 0
 
 		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ -z "${SALTED}" ]] || exit 0
+		[[ "${SALTED}" -ne 1 ]] || exit 0
 
-		echo "Updating ${REPO} to ${REMOTE_ORIGIN_SHA1}"
+		echo "Updating ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
 
 		mkdir -p "${REPO}"
 		cd "./${REPO}"
-		git remote update
+		timeout 120 git remote update origin >/dev/null
 	)
 }
 
@@ -99,14 +97,14 @@ function repo_clone_checkout_master() {
 		local BYPASSED
 
 		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
-		[[ -z "${BYPASSED}" ]] || exit 0
+		[[ "${BYPASSED}" -ne 1 ]] || exit 0
 
-		timeout 120 git clone "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
+		git clone "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
 
 		cd "./${REPO}"
 		git config core.fileMode false
 		git checkout master -qf
-		timeout 120 git submodule update --recursive --remote
+		git submodule update --recursive --remote
 	)
 }
 
@@ -118,17 +116,17 @@ function repo_update_reset_origin_master() {
 		local INDEX_SYNCED SALTED
 
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		[[ -z "${INDEX_SYNCED}" ]] || exit 0
+		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
 
 		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ -z "${SALTED}" ]] || exit 0
+		[[ "${SALTED}" -ne 1 ]] || exit 0
 
-		echo "Updating ${REPO} to ${REMOTE_ORIGIN_SHA1}"
+		echo "Updating ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
 
 		cd "./${REPO}"
 		CHANGES=$(git status -s --ignore-submodules --untracked-files=no | wc -l)
 		[ "$CHANGES" -ge 0 ] || git stash
-		timeout 60 git remote update
+		timeout 60 git remote update origin >/dev/null
 		git checkout master -qf
 		git reset --hard origin/master
 		timeout 60 git submodule update --init
@@ -159,7 +157,7 @@ function cmd_push_and_reset_origin_master() {
 		local INDEX_SYNCED CHANGES
 
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		[[ -z "${INDEX_SYNCED}" ]] || exit 0
+		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
 
 		cd "./${REPO}"
 		CHANGES=$(git log --oneline origin/master..HEAD)
@@ -179,7 +177,7 @@ function cmd_review_and_reset_origin_master() {
 		local INDEX_SYNCED CHANGES
 
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		[[ -z "${INDEX_SYNCED}" ]] || exit 0
+		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
 
 		cd "./${REPO}"
 		CHANGES=$(git log --oneline origin/master..HEAD | wc -l)
@@ -199,11 +197,11 @@ function cmd_reset_origin_master() {
 		local SALTED INDEX_SYNCED CHANGES VALID_GIT_REPO
 
 		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ -z "${SALTED}" ]] || exit 0
+		[[ "${SALTED}" -ne 1 ]] || exit 0
 
 		# Note that REMOTE_ORIGIN_SHA1 might be higher than what is known in .git
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		if [ -z "${INDEX_SYNCED}" ]; then
+		if [ "${INDEX_SYNCED}" -ne 1 ]; then
 			# Check if the repo is in working condition
 			echo -n "Checking integrity of ${REPO}..."
 			VALID_GIT_REPO=$(check_git_repo_is_valid "${REPO}")
@@ -222,13 +220,13 @@ function cmd_reset_origin_master() {
 		# Stash any working copy changes checkout/reset master
 		CHANGES=$(git status -s --ignore-submodule --untracked-file=no | wc -l)
 		[ "$CHANGES" -ge 0 ] || git stash
-		if [ -z "${INDEX_SYNCED}" ]; then
-			echo "Resetting ${REPO} to origin/master"
+		if [ "${INDEX_SYNCED}" -ne 1 ]; then
+			echo "Resetting ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
 			git checkout master -qf
 			git reset --hard origin/master
 		fi
-		timeout 15 git submodule foreach --recursive git clean -x -f -d
-		timeout 15 git submodule foreach git reset --hard
+		git submodule foreach git clean -x -f -d
+		git submodule foreach git reset --hard
 	)
 }
 
@@ -239,7 +237,7 @@ function cmd_gc() {
 		local SALTED INDEX_SYNCED CHANGES VALID_GIT_REPO
 
 		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ -z "${SALTED}" ]] || exit 0
+		[[ "${SALTED}" -ne 1 ]] || exit 0
 
 		cd "./${REPO}"
 		git gc
@@ -259,24 +257,51 @@ function check_git_repo_is_valid() {
 	exit 0
 }
 
+function local_origin_matches_upstream_origin() {
+	local REPO=$1
+	local REMOTE_ORIGIN_SHA1=$2
+	local LOCAL_ORIGIN_MASTER_HEAD_SHA1_FILE="${REPO}/.git/refs/remotes/origin/master"
+	(
+		set +e
+		local LOCAL_ORIGIN_SHA1
+
+		[ -n "${REMOTE_ORIGIN_SHA1}" ] || exit 127
+
+		# https://stackoverflow.com/a/46163991
+		IFS= read -r -d '' LOCAL_ORIGIN_SHA1 <"$LOCAL_ORIGIN_MASTER_HEAD_SHA1_FILE"
+		if [ "${LOCAL_ORIGIN_SHA1//$'\n'/}" == "${REMOTE_ORIGIN_SHA1}" ]; then
+			echo 1
+			exit 0
+		fi
+
+		# Slower, more through check
+		cd "./${REPO}" || exit $?
+		[ "$(git show-ref -s origin/master)" == "${REMOTE_ORIGIN_SHA1}" ] || exit 0
+
+		echo 1
+	) 2>/dev/null
+
+	exit 0
+}
+
 function head_matches_upstream_origin() {
 	local REPO=$1
 	local REMOTE_ORIGIN_SHA1=$2
-	local LOCAL_ORIGIN_HEAD_FILE="${REPO}/.git/ORIG_HEAD"
 	local LOCAL_HEAD_FILE="${REPO}/.git/HEAD"
+	local LOCAL_MASTER_HEAD_SHA1_FILE="${REPO}/.git/refs/heads/master"
 	(
 		set +e
-		local LOCAL_ORIGIN_SHA1 LOCAL_HEAD
+		local LOCAL_HEAD LOCAL_MASTER_SHA1
 
-		[ -n "${REMOTE_ORIGIN_SHA1}" ] || exit 128
+		[ -n "${REMOTE_ORIGIN_SHA1}" ] || exit 127
 
 		# https://stackoverflow.com/a/46163991
 		IFS= read -r -d '' LOCAL_HEAD <"$LOCAL_HEAD_FILE"
-		[ "${LOCAL_HEAD//$'\n'/}" == 'ref: refs/heads/master' ] || exit 0
+		[ "${LOCAL_HEAD//$'\n'/}" == "ref: refs/heads/master" ] || exit 0
 
 		# https://stackoverflow.com/a/46163991
-		IFS= read -r -d '' LOCAL_ORIGIN_SHA1 <"$LOCAL_ORIGIN_HEAD_FILE"
-		[ "${LOCAL_ORIGIN_SHA1//$'\n'/}" == "${REMOTE_ORIGIN_SHA1}" ] || exit 0
+		IFS= read -r -d '' LOCAL_MASTER_SHA1 <"$LOCAL_MASTER_HEAD_SHA1_FILE"
+		[ "${LOCAL_MASTER_SHA1//$'\n'/}" == "${REMOTE_ORIGIN_SHA1}" ] || exit 0
 
 		echo 1
 	) 2>/dev/null
@@ -291,10 +316,10 @@ function repo_salt_if_archived() {
 
 		if
 			[ -f "./${REPO}/ARCHIVED" ] ||
-			[ -f "./${REPO}/OBSOLETE" ] ||
-			[ -f "./${REPO}/OBSOLETE.txt" ];
+				[ -f "./${REPO}/OBSOLETE" ] ||
+				[ -f "./${REPO}/OBSOLETE.txt" ]
 		then
-			echo "Marked ${REPO} as ignored" >/dev/stderr
+			echo "Marked ${REPO} as ignored" >&2
 			rm -rf "./${REPO}/*"
 			echo -n >"./${REPO}/IGNORE"
 			echo 1
@@ -319,7 +344,7 @@ function repo_bypass_creation_if_archived() {
 				2>&1 | grep -Pc '^\s*HTTP/\d(\.\d)?\s2\d\d\s'
 		)
 		if [ "$COUNT" -ge 1 ]; then
-			echo "Marked ${REPO} as ignored" >/dev/stderr
+			echo "Marked ${REPO} as ignored" >&2
 			mkdir -p "${REPO}"
 			echo -n >"./${REPO}/IGNORE"
 			echo 1
@@ -348,13 +373,18 @@ function git_command_all() {
 	# Cannot exceed the server-side connection limits
 	declare -i PROCESSORS=4
 
+	if [ -z "${OPERATION}" ]; then
+		print_usage
+		exit 1
+	fi
+
 	declare -A REMOTE_SHA1_BY_REPO
 	echo -n "Retrieving known MediaWiki extension list..."
 	# shellcheck disable=SC2162
 	while IFS='|' read -r sha1 name; do
 		#echo "Found upstream repo '$name'"
 		if [[ -v REMOTE_SHA1_BY_REPO[$name] ]]; then
-			echo "Duplicate REMOTE_SHA1_BY_REPO entry '$name' (hazard)!"
+			echo "Duplicate REMOTE_SHA1_BY_REPO entry '$name' (hazard)!" >&2
 			exit 1
 		fi
 		REMOTE_SHA1_BY_REPO[$name]="$sha1"
@@ -409,7 +439,8 @@ function git_command_all() {
 		COMMAND='cmd_gc'
 		;;
 	*)
-		echo "Invalid command: ${OPERATION}"
+		echo "Invalid command: ${OPERATION}" >>/dev/stderr
+		print_usage
 		exit 127
 		;;
 	esac
@@ -431,9 +462,9 @@ function git_command_all() {
 			declare -i CODE=$?
 
 			if [ $CODE -ne 0 ]; then
-				echo -e "[${REPO}] FAILED (${CODE}):\n${OUT}"
+				echo -e "[${REPO}] (upstream: ${REMOTE_ORIGIN_SHA1:0:7}) FAILED:\n${OUT}"
 			elif [ -n "${OUT}" ]; then
-				echo -e "[${REPO}] OK:\n${OUT}"
+				echo -e "[${REPO}] (upstream: ${REMOTE_ORIGIN_SHA1:0:7}) OK:\n${OUT}"
 			fi
 
 			exit $CODE
@@ -444,7 +475,7 @@ function git_command_all() {
 		CHILD_JOB_COUNT=$((CHILD_JOB_COUNT + 1))
 		while [ "$CHILD_JOB_COUNT" -ge "$PROCESSORS" ]; do
 			wait -n
-			# Try to ropgate SIGINT upward
+			# Try to propagate SIGINT upward
 			[ $! -ne 130 ] || exit $!
 			CHILD_JOB_COUNT=$(jobs -r | wc -l)
 		done
