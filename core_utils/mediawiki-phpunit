@@ -65,6 +65,16 @@ function execute_mediawiki_phpunit() {
 function execute_mediawiki_paratest() {
     local MEDIAWIKI_DIR=$1
     local TMPFS_DIR=$2
+    local PHP_ARGS=""
+
+	if [ -w /opcache/php ]; then
+		echo "Using shared OPCache directory /opcache/php"
+		PHP_ARGS+=" -d opcache.enable=1"
+		PHP_ARGS+=" -d opcache.enable_cli=1"
+		PHP_ARGS+=" -d opcache.file_cache=/opcache/php"
+		PHP_ARGS+=" -d opcache.file_cache_only=1"
+	fi
+
     (
         cd "$MEDIAWIKI_DIR" || exit 1
         # XXX: ugly work-around poorly divided suites
@@ -75,7 +85,9 @@ function execute_mediawiki_paratest() {
             --configuration tests/phpunit/mw_core_suite.xml \
             --bootstrap "${BASE_DIR}/../config/dummy.php" \
             --parallel-suite \
+            --runner Runner \
             --colors \
+            --passthru-php="${PHP_ARGS}" \
             --passthru="--conf ParatestWrapperSettings.php --colors=always ${ARGS[@]}" 2>&1
     )
 }
