@@ -42,10 +42,10 @@ function sync_project_code() {
 	local SRC_VENDOR_MTIME DST_VENDOR_MTIME
 	local SRC_NODE_MTIME DST_NODE_MTIME
 
-	SRC_GIT_MTIME=$(stat_file_w10 "${SRC_GIT_INDEX}")
-	DST_GIT_MTIME=$(stat_file_wsl "${DST_GIT_INDEX}")
+	SRC_GIT_MTIME=$(file_mtime_w10 "${SRC_GIT_INDEX}")
+	DST_GIT_MTIME=$(file_mtime_wsl "${DST_GIT_INDEX}")
 	if [ -z "${SRC_GIT_MTIME}" ]; then
-		if [ -n "$(stat_file_w10 "${SRC}/IGNORE")" ]; then
+		if [ -n "$(file_mtime_w10 "${SRC}/IGNORE")" ]; then
 			# Repo was removed from gerrit at some point
 			exit 0
 		else
@@ -80,9 +80,9 @@ function sync_project_code() {
 	fi
 
 	# Synchronize composer files that are not in the Git repo
-	SRC_VENDOR_MTIME=$(stat_file_w10 "${SRC_VENDOR}")
+	SRC_VENDOR_MTIME=$(file_mtime_w10 "${SRC_VENDOR}")
 	if [ -n "${SRC_VENDOR_MTIME}" ]; then
-		DST_VENDOR_MTIME=$(stat_file_wsl "${DST_VENDOR}")
+		DST_VENDOR_MTIME=$(file_mtime_wsl "${DST_VENDOR}")
 		if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
 			echo "Vendor: ${DST} (@${DST_VENDOR_MTIME} -> @${SRC_VENDOR_MTIME})"
 			rsync -rltDiq "${SRC_VENDOR}/" "${DST_VENDOR}" || exit 1
@@ -91,9 +91,9 @@ function sync_project_code() {
 	fi
 
 	# Synchronize NPM files that are not in the Git repo
-	SRC_NODE_MTIME=$(stat_file_w10 "${SRC_NPM}")
+	SRC_NODE_MTIME=$(file_mtime_w10 "${SRC_NPM}")
 	if [ -n "${SRC_NODE_MTIME}" ]; then
-		DST_NODE_MTIME=$(stat_file_wsl "${DST_NPM}")
+		DST_NODE_MTIME=$(file_mtime_wsl "${DST_NPM}")
 		if [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
 			echo "NPM: ${DST} (@${DST_NODE_MTIME} -> @${SRC_NODE_MTIME})"
 			rsync -rltDiq "${SRC_NPM}/" "${DST_NPM}" || exit 1
@@ -193,7 +193,7 @@ function sync_project_config() {
 	rsync -rltDiq --include '*Settings.php' --exclude '*' "${SRC}/" "${DST}/"
 }
 
-function stat_file_w10() {
+function file_mtime_w10() {
 	local FILE_PATH=$1
 
 	local MTIME
@@ -201,21 +201,21 @@ function stat_file_w10() {
 		MTIME="${MTIME_CACHE_W10[$FILE_PATH]}"
 	else
 		# Note that find.exe is slower if no batching is used
-		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "%TT" 2>/dev/null)
+		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "%T+" 2>/dev/null)
 		echo "StatMiss [${FILE_PATH}] = ${MTIME}" >&2
 	fi
 
 	echo "${MTIME}"
 }
 
-function stat_file_wsl() {
+function file_mtime_wsl() {
 	local FILE_PATH=$1
 
 	local MTIME
 	if [[ -v MTIME_CACHE_WSL[$FILE_PATH] ]]; then
 		MTIME="${MTIME_CACHE_WSL[$FILE_PATH]}"
 	else
-		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "%TT" 2>/dev/null)
+		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "%T+" 2>/dev/null)
 		echo "StatMiss [${FILE_PATH}] = ${MTIME}" >&2
 	fi
 
