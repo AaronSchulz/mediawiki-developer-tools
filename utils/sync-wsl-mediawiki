@@ -23,7 +23,10 @@ if [ "$(whoami)" != "${WWW_USER}" ]; then
     exit 1
 fi
 
-if [ ! -w "${WSL_MEDIAWIKI}" ]; then
+if [ ! -d "${W10_MEDIAWIKI}" ]; then
+    echo "${W10_MEDIAWIKI} does not exist"
+    exit 1
+elif [ ! -w "${WSL_MEDIAWIKI}" ]; then
     echo "${WSL_MEDIAWIKI} does not exist or is not writable"
     exit 1
 fi
