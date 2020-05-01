@@ -44,12 +44,12 @@ function repo_init_update_remote() {
 		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
 		[[ "${BYPASSED}" -ne 1 ]] || exit 0
 
-		echo "Initializing ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
+		echo "Initializing ${REPO}"
 
 		mkdir -p "${REPO}"
 		cd "./${REPO}"
 		git init -q
-		git config core.fileMode false
+		git config core.filemode false
 		git remote add origin "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
 		git remote update >/dev/null
 		git checkout master -fq
@@ -67,10 +67,7 @@ function repo_update_remote() {
 		ORIGIN_SYNCED=$(local_origin_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 		[[ "${ORIGIN_SYNCED}" -ne 1 ]] || exit 0
 
-		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ "${SALTED}" -ne 1 ]] || exit 0
-
-		echo "Updating ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
+		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
 
 		mkdir -p "${REPO}"
 		cd "./${REPO}"
@@ -102,7 +99,7 @@ function repo_clone_checkout_master() {
 		git clone "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
 
 		cd "./${REPO}"
-		git config core.fileMode false
+		git config core.filemode false
 		git checkout master -qf
 		git submodule update --recursive --remote
 	)
@@ -113,15 +110,12 @@ function repo_update_reset_origin_master() {
 	local REMOTE_ORIGIN_SHA1=$2
 	(
 		set -e
-		local INDEX_SYNCED SALTED
+		local INDEX_SYNCED SALTED CHANGES
 
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
 
-		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ "${SALTED}" -ne 1 ]] || exit 0
-
-		echo "Updating ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
+		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
 
 		cd "./${REPO}"
 		CHANGES=$(git status -s --ignore-submodules --untracked-files=no | wc -l)
@@ -185,6 +179,8 @@ function cmd_review_and_reset_origin_master() {
 			timeout 60 git remote update
 			timeout 60 git-review
 			git reset --hard origin/master
+		elif [ "${CHANGES}" -gt 1 ]; then
+			echo "Repo ${REPO} has multiple commits...skipping" >&2
 		fi
 	)
 }
@@ -234,13 +230,11 @@ function cmd_gc() {
 	local REPO=$1
 	(
 		set -e
-		local SALTED INDEX_SYNCED CHANGES VALID_GIT_REPO
-
-		SALTED=$(repo_salt_if_archived "${REPO}")
-		[[ "${SALTED}" -ne 1 ]] || exit 0
 
 		cd "./${REPO}"
+		echo -n "Compressing ${REPO}..."
 		git gc
+		echo "done"
 	)
 }
 
@@ -274,7 +268,7 @@ function local_origin_matches_upstream_origin() {
 			exit 0
 		fi
 
-		# Slower, more through check
+		# Slower, more thorough check
 		cd "./${REPO}" || exit $?
 		[ "$(git show-ref -s origin/master)" == "${REMOTE_ORIGIN_SHA1}" ] || exit 0
 
@@ -311,19 +305,19 @@ function head_matches_upstream_origin() {
 
 function repo_salt_if_archived() {
 	local REPO=$1
+	local FILES_CHECK=("${REPO}/ARCHIVED" "${REPO}/OBSOLETE" "${REPO}/OBSOLETE.txt")
 	(
 		set +e
 
-		if
-			[ -f "./${REPO}/ARCHIVED" ] ||
-				[ -f "./${REPO}/OBSOLETE" ] ||
-				[ -f "./${REPO}/OBSOLETE.txt" ]
-		then
-			echo "Marked ${REPO} as ignored" >&2
-			rm -rf "./${REPO}/*"
-			echo -n >"./${REPO}/IGNORE"
-			echo 1
-		fi
+		for FILE_CHECK in "${FILES_CHECK[@]}"; do
+			if [ -f "./${FILE_CHECK}" ]; then
+				echo -n "Marking ${REPO} as ignored..." >&2
+				rm -rf "./${REPO}/*"
+				echo -n >"./${REPO}/IGNORE"
+				echo "done" >&2
+				echo 1
+			fi
+		done
 	)
 
 	exit 0
@@ -332,17 +326,12 @@ function repo_salt_if_archived() {
 function repo_bypass_creation_if_archived() {
 	local REPO=$1
 	local PREFIX="${GITTILES_URL}/${GERRIT_EXT_DIR}${REPO}/+/master/"
+	local FILES_CHECK=("${PREFIX}/ARCHIVED" "${PREFIX}/OBSOLETE" "${PREFIX}/OBSOLETE.txt")
 	(
 		set +e
 
 		declare -i COUNT
-		COUNT=$(
-			wget --method=HEAD --spider -S -nv \
-				"${PREFIX}/ARCHIVED" \
-				"${PREFIX}/OBSOLETE" \
-				"${PREFIX}/OBSOLETE.txt" \
-				2>&1 | grep -Pc '^\s*HTTP/\d(\.\d)?\s2\d\d\s'
-		)
+		COUNT=$(curl -sL --head "${FILES_CHECK[@]}" | grep -Pc '^\s*HTTP/\d(\.\d)?\s2\d\d\s')
 		if [ "$COUNT" -ge 1 ]; then
 			echo "Marked ${REPO} as ignored" >&2
 			mkdir -p "${REPO}"
