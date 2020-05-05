@@ -1,34 +1,48 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-W10_USER=$(/mnt/c/WINDOWS/system32/whoami.exe | grep -Po '[^\\]+$' | tr -d '\r')
-WWW_USER="www-data"
-W10_FIND_BIN="/mnt/c/Program Files/Git/usr/bin/find.exe"
-W10_MEDIAWIKI="/mnt/c/Users/${W10_USER}/PhpstormProjects/mediawiki"
-WSL_MEDIAWIKI="/srv/mediawiki"
-W10_CORE="${W10_MEDIAWIKI}/core"
-WSL_CORE="${WSL_MEDIAWIKI}/core"
-W10_SKINS="${W10_MEDIAWIKI}/skins"
-WSL_SKINS="${WSL_MEDIAWIKI}/skins"
-W10_EXTENSIONS="${W10_MEDIAWIKI}/extensions"
-WSL_EXTENSIONS="${WSL_MEDIAWIKI}/extensions"
+# Variables that depend on the OS that owns the "development" MediaWiki directory
+if [[ -d "/mnt/c/WINDOWS/System32" ]]; then
+	if [ ! -f "/mnt/c/Program Files/Git/bin/git.exe" ]; then
+		echo "Could not detect Git for Windows (https://git-scm.com/download/win)"
+		exit 1
+	fi
+	DEV_OS_CUR_USER=$("/mnt/c/WINDOWS/system32/whoami.exe" | grep -Po '[^\\]+$' | tr -d '\r')
+	# ~/bin/find only picks the executable based on $PWD, not the path arguments to "find"
+	DEV_OS_FIND_BIN="/mnt/c/Program Files/Git/usr/bin/find.exe"
+else
+	DEV_OS_CUR_USER=$(whoami)
+	DEV_OS_FIND_BIN="find"
+fi
+# Customizable "development" base MediaWiki directory (used by IDE)
+DEV_MW_DIR=${DEV_MW_DIR:-"/mnt/c/Users/${DEV_OS_CUR_USER}/PhpstormProjects/mediawiki"}
+DEV_MW_CORE="${DEV_MW_DIR}/core"
+DEV_MW_SKINS="${DEV_MW_DIR}/skins"
+DEV_MW_EXTENSIONS="${DEV_MW_DIR}/extensions"
+# Customizable "server" base MediaWiki directory (used by web server)
+SRV_MW_DIR=${SRV_MW_DIR:-"/srv/mediawiki"}
+SRV_MW_CORE="${SRV_MW_DIR}/core"
+SRV_MW_SKINS="${SRV_MW_DIR}/skins"
+SRV_MW_EXTENSIONS="${SRV_MW_DIR}/extensions"
+# Customizable name of user that owns the "server" MediaWiki files
+SRV_USER=${SRV_USER:-"www-data"}
 
-declare -A MTIME_CACHE_W10
-declare -A MTIME_CACHE_WSL
+declare MTIME_FORMAT="%TT %TD"
+declare -A MTIME_CACHE
 
 declare -i PROCESSORS
 PROCESSORS=$(nproc)
 
-if [ "$(whoami)" != "${WWW_USER}" ]; then
-    echo "Script must be run as user: ${WWW_USER}"
-    exit 1
+if [ "$(whoami)" != "${SRV_USER}" ]; then
+	echo "Script must be run as user: ${SRV_USER}"
+	exit 1
 fi
 
-if [ ! -d "${W10_MEDIAWIKI}" ]; then
-    echo "${W10_MEDIAWIKI} does not exist"
-    exit 1
-elif [ ! -w "${WSL_MEDIAWIKI}" ]; then
-    echo "${WSL_MEDIAWIKI} does not exist or is not writable"
-    exit 1
+if [ ! -d "${DEV_MW_DIR}" ]; then
+	echo "${DEV_MW_DIR} does not exist"
+	exit 1
+elif [ ! -w "${SRV_MW_DIR}" ]; then
+	echo "${SRV_MW_DIR} does not exist or is not writable"
+	exit 1
 fi
 
 function sync_project_code() {
@@ -45,16 +59,16 @@ function sync_project_code() {
 	local SRC_VENDOR_MTIME DST_VENDOR_MTIME
 	local SRC_NODE_MTIME DST_NODE_MTIME
 
-	SRC_GIT_MTIME=$(file_mtime_w10 "${SRC_GIT_INDEX}")
-	DST_GIT_MTIME=$(file_mtime_wsl "${DST_GIT_INDEX}")
+	SRC_GIT_MTIME=$(file_mtime "${SRC_GIT_INDEX}")
+	DST_GIT_MTIME=$(file_mtime "${DST_GIT_INDEX}")
 	if [ -z "${SRC_GIT_MTIME}" ]; then
-		if [ -n "$(file_mtime_w10 "${SRC}/IGNORE")" ]; then
+		if [ -n "$(file_mtime "${SRC}/IGNORE")" ]; then
 			# Repo was removed from gerrit at some point
 			exit 0
 		else
 			# There should be a .git directory and index
 			echo "File not found: ${SRC_GIT_INDEX}" >&2
-			exit 1
+			exit 2
 		fi
 	elif [ "${SRC_GIT_MTIME}" != "${DST_GIT_MTIME}" ]; then
 		echo "Git repo: ${DST} (@${DST_GIT_MTIME} -> @${SRC_GIT_MTIME})"
@@ -83,9 +97,9 @@ function sync_project_code() {
 	fi
 
 	# Synchronize composer files that are not in the Git repo
-	SRC_VENDOR_MTIME=$(file_mtime_w10 "${SRC_VENDOR}")
+	SRC_VENDOR_MTIME=$(file_mtime "${SRC_VENDOR}")
 	if [ -n "${SRC_VENDOR_MTIME}" ]; then
-		DST_VENDOR_MTIME=$(file_mtime_wsl "${DST_VENDOR}")
+		DST_VENDOR_MTIME=$(file_mtime "${DST_VENDOR}")
 		if [ "${SRC_VENDOR_MTIME}" != "${DST_VENDOR_MTIME}" ]; then
 			echo "Vendor: ${DST} (@${DST_VENDOR_MTIME} -> @${SRC_VENDOR_MTIME})"
 			rsync -rltDiq "${SRC_VENDOR}/" "${DST_VENDOR}" || exit 1
@@ -94,9 +108,9 @@ function sync_project_code() {
 	fi
 
 	# Synchronize NPM files that are not in the Git repo
-	SRC_NODE_MTIME=$(file_mtime_w10 "${SRC_NPM}")
+	SRC_NODE_MTIME=$(file_mtime "${SRC_NPM}")
 	if [ -n "${SRC_NODE_MTIME}" ]; then
-		DST_NODE_MTIME=$(file_mtime_wsl "${DST_NPM}")
+		DST_NODE_MTIME=$(file_mtime "${DST_NPM}")
 		if [ "${SRC_NODE_MTIME}" != "${DST_NODE_MTIME}" ]; then
 			echo "NPM: ${DST} (@${DST_NODE_MTIME} -> @${SRC_NODE_MTIME})"
 			rsync -rltDiq "${SRC_NPM}/" "${DST_NPM}" || exit 1
@@ -111,9 +125,9 @@ function sync_dir_subprojects() {
 	shift 2
 	local PROJECT_NAMES=("$@")
 
-	local SRC_PROJECT_ROOT DST_PROJECT_ROOT OUT
+	local SRC_PROJECT_ROOT DST_PROJECT_ROOT
 
-	prestat_dir_projects "${SRC}" "${DST}" "${PROJECT_NAMES[@]}" || exit 1
+	prestat_dir_projects "${SRC}" "${DST}" "${PROJECT_NAMES[@]}" || exit $?
 
 	set -m
 	declare -i CHILD_JOB_COUNT=0
@@ -126,7 +140,7 @@ function sync_dir_subprojects() {
 		while [ "$CHILD_JOB_COUNT" -ge "$PROCESSORS" ]; do
 			wait -n
 			# Try to propagate SIGINT upward
-			[ $! -ne 130 ] || exit $!
+			[[ $? -ne 130 ]] && [[ $? -ne 2 ]] || exit $?
 			CHILD_JOB_COUNT=$(jobs -r | wc -l)
 		done
 	done
@@ -138,55 +152,52 @@ function prestat_dir_projects() {
 	local DST=$2
 	shift 2
 	local PROJECT_NAMES=("$@")
-	local SRC_NO_MNT="${SRC/#\/mnt\//\/}"
 
-	local SRC_PROJECT DST_PROJECT FILE_PATH
+	local SRC_WITHOUT_MNT_PREFIX="${SRC/#\/mnt\//\/}"
+	local SRC_PROJECT DST_PROJECT FILE_PATH CODE=0
 
 	# Initialize a NULL last-modified timestamp for each NTFS file to stat
 	for PROJECT_NAME in "${PROJECT_NAMES[@]}"; do
 		SRC_PROJECT="${SRC}/${PROJECT_NAME}"
-		MTIME_CACHE_W10["${SRC_PROJECT}/.git/index"]=""
-		MTIME_CACHE_W10["${SRC_PROJECT}/vendor"]=""
-		MTIME_CACHE_W10["${SRC_PROJECT}/node_modules"]=""
-		MTIME_CACHE_W10["${SRC_PROJECT}/IGNORE"]=""
+		MTIME_CACHE["${SRC_PROJECT}/.git/index"]=""
+		MTIME_CACHE["${SRC_PROJECT}/vendor"]=""
+		MTIME_CACHE["${SRC_PROJECT}/node_modules"]=""
+		MTIME_CACHE["${SRC_PROJECT}/IGNORE"]=""
 
 		DST_PROJECT="${DST}/${PROJECT_NAME}"
-		MTIME_CACHE_WSL["${DST_PROJECT}/.git/index"]=""
-		MTIME_CACHE_WSL["${DST_PROJECT}/vendor"]=""
-		MTIME_CACHE_WSL["${DST_PROJECT}/node_modules"]=""
+		MTIME_CACHE["${DST_PROJECT}/.git/index"]=""
+		MTIME_CACHE["${DST_PROJECT}/vendor"]=""
+		MTIME_CACHE["${DST_PROJECT}/node_modules"]=""
 	done
 
 	# Preload the last-modified timestamp for each of these source files that exist
-	while IFS=$'|\n' read -r relative_path last_modified; do
+	while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
 		FILE_PATH="${SRC}/${relative_path}"
 		#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
-		MTIME_CACHE_W10[$FILE_PATH]="${last_modified}"
+		MTIME_CACHE[$FILE_PATH]="${last_modified}"
 	done < <(
-		"${W10_FIND_BIN}" "${SRC_NO_MNT}" \
-		-mindepth 2 -maxdepth 3 \
-		\( \
+		"${DEV_OS_FIND_BIN}" "${SRC_WITHOUT_MNT_PREFIX}" \
+		-mindepth 2 -maxdepth 3 \( \
 			-path "\*/.git/index" -o \
 			-path "\*/vendor" -o \
 			-path "\*/node_modules" -o \
 			-path "\*/IGNORE" \
-		\) \
-		-printf "%P|%TT\n" 2>/dev/null
+		\) -printf "%P|${MTIME_FORMAT}\n"
 	)
+	[[ $CODE -eq 0 ]] || exit 2
+
 	# Preload the last-modified timestamp for each of these destination files that exist
-	while IFS=$'|\n' read -r relative_path last_modified; do
+	while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
 		FILE_PATH="${DST}/${relative_path}"
 		#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
-		MTIME_CACHE_WSL[$FILE_PATH]="${last_modified}"
+		MTIME_CACHE[$FILE_PATH]="${last_modified}"
 	done < <(
 		find "${DST}" \
 		-mindepth 2 -maxdepth 3 \
-		\( \
-			-path "*/.git/index" -o \
-			-path "*/vendor" -o \
-			-path "*/node_modules" \
-		\) \
-		-printf "%P|%TT\n" 2>/dev/null
+		\( -path "*/.git/index" -o -path "*/vendor" -o -path "*/node_modules" \) \
+		-printf "%P|${MTIME_FORMAT}\n"
 	)
+	[[ $CODE -eq 0 ]] || exit 2
 }
 
 function sync_project_config() {
@@ -196,50 +207,49 @@ function sync_project_config() {
 	rsync -rltDiq --include '*Settings.php' --exclude '*' "${SRC}/" "${DST}/"
 }
 
-function file_mtime_w10() {
+function file_mtime() {
 	local FILE_PATH=$1
 
 	local MTIME
-	if [[ -v MTIME_CACHE_W10[$FILE_PATH] ]]; then
-		MTIME="${MTIME_CACHE_W10[$FILE_PATH]}"
+
+	if [[ "${FILE_PATH}" != /* ]]; then
+		echo "Path is not absolute: ${FILE_PATH}" 1>&2
+		exit 127
+	fi
+
+	if [[ -v MTIME_CACHE[$FILE_PATH] ]]; then
+		MTIME="${MTIME_CACHE[$FILE_PATH]}"
 	else
-		# Note that find.exe is slower if no batching is used
-		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "%T+" 2>/dev/null)
+		# Note that find.exe is slower here than /usr/bin/find
+		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "${MTIME_FORMAT}\n" 2>/dev/null)
 		echo "StatMiss [${FILE_PATH}] = ${MTIME}" >&2
 	fi
 
 	echo "${MTIME}"
 }
 
-function file_mtime_wsl() {
-	local FILE_PATH=$1
-
-	local MTIME
-	if [[ -v MTIME_CACHE_WSL[$FILE_PATH] ]]; then
-		MTIME="${MTIME_CACHE_WSL[$FILE_PATH]}"
-	else
-		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "%T+" 2>/dev/null)
-		echo "StatMiss [${FILE_PATH}] = ${MTIME}" >&2
-	fi
-
-	echo "${MTIME}"
-}
+mkdir -p "${DEV_MW_DIR}" "${SRV_MW_SKINS}" "${SRV_MW_EXTENSIONS}" || exit 1
 
 set -m
 trap "wait && exit" INT
 (
-	prestat_dir_projects "${W10_MEDIAWIKI}" "${WSL_MEDIAWIKI}" "core" || exit 1
-	sync_project_code "${W10_CORE}" "${WSL_CORE}" || exit 1
-	sync_project_config	"${W10_CORE}" "${WSL_CORE}"
+	# Set $PWD so that ~/bin/find picks the right executable
+	cd "${DEV_MW_DIR}" || exit 1
+	sync_dir_subprojects "${DEV_MW_DIR}" "${SRV_MW_DIR}" "core" || exit $?
+	sync_project_config "${DEV_MW_CORE}" "${SRV_MW_CORE}"
 ) &
 (
-	mapfile -t REPO_NAMES < <(find "${W10_SKINS}" -mindepth 1 -maxdepth 1 -type d -printf "%P\n")
-	rsync -dq "${W10_SKINS}/" "${WSL_SKINS}" || exit 1
-	sync_dir_subprojects "${W10_SKINS}" "${WSL_SKINS}" "${REPO_NAMES[@]}"
+	declare -a REPOS
+	# Set $PWD so that ~/bin/find picks the right executable
+	cd "${DEV_MW_SKINS}" || exit 1
+	for SUBDIR in */; do REPOS+=( "${SUBDIR%/*}" ); done
+	sync_dir_subprojects "${DEV_MW_SKINS}" "${SRV_MW_SKINS}" "${REPOS[@]}"
 ) &
 (
-	mapfile -t REPO_NAMES < <(find "${W10_EXTENSIONS}" -mindepth 1 -maxdepth 1 -type d -printf "%P\n")
-	rsync -dq "${W10_EXTENSIONS}/" "${WSL_EXTENSIONS}" || exit 1
-	sync_dir_subprojects "${W10_EXTENSIONS}" "${WSL_EXTENSIONS}" "${REPO_NAMES[@]}"
+	declare -a REPOS
+	# Set $PWD so that ~/bin/find picks the right executable
+	cd "${DEV_MW_EXTENSIONS}" || exit 1
+	for SUBDIR in */; do REPOS+=( "${SUBDIR%/*}" ); done
+	sync_dir_subprojects "${DEV_MW_EXTENSIONS}" "${SRV_MW_EXTENSIONS}" "${REPOS[@]}"
 ) &
 wait

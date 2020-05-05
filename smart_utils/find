@@ -3,12 +3,26 @@
 # Avoid shelling out to basename
 COMMAND="${0##*/}"
 
-# Use the "Git for Windows" program if $PWD belongs to Windows
-case "$(pwd -P)" in /mnt/[cde]/*)
-    BIN_PATH="/mnt/c/Program Files/Git/usr/bin/$COMMAND.exe"
-    [ ! -x "$BIN_PATH" ] || exec "$BIN_PATH" "$@"
-    ;;
-esac
+HAS_NON_DRIVE_ABS_PATH_ARG=0
+for ARG in "$@"; do
+	# "Git for Windows" uses "/x/*" in places were WSL uses "/mnt/x/*".
+	# Also, it has its own special paths like "/proc" and "/run".
+	case "$ARG" in
+		/[cde]/*)
+			;;
+		/*)
+			HAS_NON_DRIVE_ABS_PATH_ARG=1
+			;;
+	esac
+done
+# Use Win32 "Git for Windows" program if $PWD and any path arguments belong to Windows
+if [ "$HAS_NON_DRIVE_ABS_PATH_ARG" -eq 0 ]; then
+	case "$(pwd -P)" in /mnt/[cde]/*)
+		BIN_PATH="/mnt/c/Program Files/Git/usr/bin/$COMMAND.exe"
+		[ ! -x "$BIN_PATH" ] || exec "$BIN_PATH" "$@"
+		;;
+	esac
+fi
 # Otherwise, use the Linux program (custom => distribution => pre-init utils)
 for BIN_DIR in "/usr/local/bin" "/usr/bin"; do
     [ ! -x "$BIN_DIR/$COMMAND" ] || exec "$BIN_DIR/$COMMAND" "$@"
