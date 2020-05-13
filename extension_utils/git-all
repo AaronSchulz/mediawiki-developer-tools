@@ -110,17 +110,19 @@ function repo_update_reset_origin_master() {
 	local REMOTE_ORIGIN_SHA1=$2
 	(
 		set -e
-		local INDEX_SYNCED SALTED CHANGES
+		local ORIGIN_SYNCED INDEX_SYNCED SALTED CHANGES
 
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
+
+		ORIGIN_SYNCED=$(local_origin_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 
 		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
 
 		cd "./${REPO}"
 		CHANGES=$(git status -s --ignore-submodules --untracked-files=no | wc -l)
 		[ "$CHANGES" -ge 0 ] || git stash
-		timeout 60 git remote update origin >/dev/null
+		[[ "${ORIGIN_SYNCED}" -eq 1 ]] || timeout 60 git remote update origin >/dev/null
 		git checkout master -qf
 		git reset --hard origin/master
 		timeout 60 git submodule update --init
@@ -255,6 +257,7 @@ function local_origin_matches_upstream_origin() {
 	local REPO=$1
 	local REMOTE_ORIGIN_SHA1=$2
 	local LOCAL_ORIGIN_MASTER_HEAD_SHA1_FILE="${REPO}/.git/refs/remotes/origin/master"
+	local FETCH_HEAD_FILE="${REPO}/.git/FETCH_HEAD"
 	(
 		set +e
 		local LOCAL_ORIGIN_SHA1
@@ -268,11 +271,20 @@ function local_origin_matches_upstream_origin() {
 			exit 0
 		fi
 
+		# shellcheck disable=SC2034
+		while IFS=$'\t\n' read -r local_remote_sha1 ignored; do
+			if [ "${local_remote_sha1}" == "${REMOTE_ORIGIN_SHA1}" ]; then
+				echo 1
+				exit 0
+			fi
+		done < "${FETCH_HEAD_FILE}"
+
 		# Slower, more thorough check
 		cd "./${REPO}" || exit $?
-		[ "$(git show-ref -s origin/master)" == "${REMOTE_ORIGIN_SHA1}" ] || exit 0
-
-		echo 1
+		if [ "$(git show-ref -s origin/master)" == "${REMOTE_ORIGIN_SHA1}" ]; then
+			echo 1
+			exit 0
+		fi
 	) 2>/dev/null
 
 	exit 0
@@ -283,6 +295,7 @@ function head_matches_upstream_origin() {
 	local REMOTE_ORIGIN_SHA1=$2
 	local LOCAL_HEAD_FILE="${REPO}/.git/HEAD"
 	local LOCAL_MASTER_HEAD_SHA1_FILE="${REPO}/.git/refs/heads/master"
+	local INFO_REFS_FILE="${REPO}/.git/info/refs"
 	(
 		set +e
 		local LOCAL_HEAD LOCAL_MASTER_SHA1
@@ -295,9 +308,25 @@ function head_matches_upstream_origin() {
 
 		# https://stackoverflow.com/a/46163991
 		IFS= read -r -d '' LOCAL_MASTER_SHA1 <"$LOCAL_MASTER_HEAD_SHA1_FILE"
-		[ "${LOCAL_MASTER_SHA1//$'\n'/}" == "${REMOTE_ORIGIN_SHA1}" ] || exit 0
+		if [ "${LOCAL_MASTER_SHA1//$'\n'/}" == "${REMOTE_ORIGIN_SHA1}" ]; then
+			echo 1
+			exit 0
+		fi
 
-		echo 1
+		while IFS=$'\t\n' read -r ref_sha1 ref; do
+			[ "${ref}" == "refs/heads/master" ] || continue
+			if [ "${ref_sha1}" == "${REMOTE_ORIGIN_SHA1}" ]; then
+				echo 1
+				exit 0
+			fi
+		done < "${INFO_REFS_FILE}"
+
+		# Slower, more thorough check
+		cd "./${REPO}" || exit $?
+		if [ "$(git rev-parse HEAD)" == "${REMOTE_ORIGIN_SHA1}" ]; then
+			echo 1
+			exit 0
+		fi
 	) 2>/dev/null
 
 	exit 0
