@@ -27,6 +27,7 @@ alias gsyncprod='fast_git remote update && fast_git reset --hard origin/producti
 alias gadd='fast_git add --interactive'
 alias gcommit='fast_git commit'
 alias gamend='fast_git commit -a --amend'
+alias gphpcs='fast_git diff --name-only --oneline origin/master..HEAD | xargs -d '\n' phpcs -p -s'
 
 # git-review
 alias smart_git-review='~/bin/git-review'
