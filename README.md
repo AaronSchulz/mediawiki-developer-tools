@@ -41,6 +41,11 @@ cd /path/to/mediawiki/core
 ln -s /path/to/mediawiki-developer-tools/core_utils/* .
 </code>
 
+The test runners depends on paratest, which can be installed via:
+<code>
+composer global require --dev brianium/paratest
+</code>
+
 ## Mediawiki extension utilities ##
 A set of programs that can be run from an "extensions" directory that contains MediaWiki extension repos.
 This is not same directory as the one that appears under the "core" repo.
