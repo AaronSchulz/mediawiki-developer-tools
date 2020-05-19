@@ -388,8 +388,9 @@ function get_upstream_extensions_all() {
 }
 
 function git_command_all() {
-	# Cannot exceed the server-side connection limits
-	declare -i PROCESSORS=4
+	# Stay under hard-coded server-side connection limit (4) with 1 connection to spare
+	# so that the user can do other gerrit operations while this runs in the background.
+	declare -i PROCESSORS=3
 
 	if [ -z "${OPERATION}" ]; then
 		print_usage
