@@ -50,6 +50,13 @@ function execute_mediawiki_paratest() {
     local MEDIAWIKI_DIR=$1
     local TMPFS_DIR=$2
     local PHP_ARGS=""
+    local PARATEST_BIN=""
+
+    PARATEST_BIN=$(which paratest)
+    if [ -z "${PARATEST_BIN}" ]; then
+    	echo "Could not find paratest; is composer/vendor/bin in PATH?"
+    	exit 1
+	fi
 
 	if [ -d /opcache/php ]; then
 		echo "Using shared OPCache directory: /opcache/php"
@@ -66,7 +73,7 @@ function execute_mediawiki_paratest() {
         # XXX: ugly work-around poorly divided suites
         sudo -u www-data -H cp "${BASE_DIR}/../config/mw_core_suite.xml" "./tests/phpunit/"
         sudo -u www-data -H cp "${BASE_DIR}/../config/ParatestWrapperSettings.php" "./"
-        exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H paratest \
+        exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H "${PARATEST_BIN}" \
             --phpunit tests/phpunit/phpunit.php \
             --configuration tests/phpunit/mw_core_suite.xml \
             --bootstrap "${BASE_DIR}/../config/dummy.php" \
