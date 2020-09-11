@@ -2,7 +2,8 @@
 
 WSL_CORE="/srv/mediawiki/core"
 REAL_PATH=$(realpath "$0")
-BASE_DIR=$(dirname "$REAL_PATH")
+CORE_UTILS_DIR=$(dirname "$REAL_PATH")
+BASE_DIR=$(dirname "$CORE_UTILS_DIR")
 SCRIPT_BASENAME=$(basename "$REAL_PATH")
 TMP_SUBDIR_NAME="mediawiki-phpunit"
 
@@ -31,7 +32,7 @@ function prepare_tmpfs_temp_dir() {
 
 function sync_wsl_mediawiki_dir() {
     # Make sure ~/bin/git is used for Linux/WIN32 executable selection
-    sudo -u www-data -H "${BASE_DIR}/../utils/sync-wsl-mediawiki"
+    sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR "${BASE_DIR}/utils/sync-wsl-mediawiki"
 }
 
 function execute_mediawiki_phpunit() {
@@ -49,7 +50,7 @@ function execute_mediawiki_phpunit() {
 function execute_mediawiki_paratest() {
     local MEDIAWIKI_DIR=$1
     local TMPFS_DIR=$2
-    local PHP_ARGS=""
+    local PHP_ARGS="-d display_errors=stderr"
     local PARATEST_BIN=""
 
     PARATEST_BIN=$(which paratest)
@@ -70,26 +71,33 @@ function execute_mediawiki_paratest() {
     	set -e
 
         cd "$MEDIAWIKI_DIR"
+
         # XXX: ugly work-around poorly divided suites
-        sudo -u www-data -H cp "${BASE_DIR}/../config/mw_core_suite.xml" "./tests/phpunit/"
-        sudo -u www-data -H cp "${BASE_DIR}/../config/ParatestWrapperSettings.php" "./"
+        if [ "${BASE_DIR}/config/mw_core_suite.xml" -nt "./tests/phpunit/mw_core_suite.xml" ]; then
+            sudo -u www-data -H cp "${BASE_DIR}/config/mw_core_suite.xml" "./tests/phpunit/"
+        fi
+		# XXX: work around sqlite DB concurrency limitations
+        if [ "${BASE_DIR}/config/ParatestWrapperSettings.php" -nt "./ParatestWrapperSettings.php" ]; then
+            sudo -u www-data -H cp "${BASE_DIR}/config/ParatestWrapperSettings.php" "./"
+        fi
+
         exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H "${PARATEST_BIN}" \
-            --phpunit tests/phpunit/phpunit.php \
-            --configuration tests/phpunit/mw_core_suite.xml \
-            --bootstrap "${BASE_DIR}/../config/dummy.php" \
+            --phpunit="tests/phpunit/phpunit.php" \
+            --configuration="tests/phpunit/mw_core_suite.xml" \
+            --bootstrap="${BASE_DIR}/config/dummy.php" \
             --parallel-suite \
             --runner Runner \
             --colors \
             --passthru-php="${PHP_ARGS}" \
-            --passthru="--conf ParatestWrapperSettings.php --colors=always ${ARGS[*]}" 2>&1
+            --passthru="--conf=ParatestWrapperSettings.php --colors=always ${ARGS[*]}" 2>&1
     )
 }
 
 # Try to use a tmpfs for temporary test files
 if [ "$(findmnt -no fstype -T /tmp 2>/dev/null)" == "tmpfs" ]; then
 	TMPDIR_MOUNT="/tmp"
-elif [ "$(findmnt -no fstype -T /run/shm 2>/dev/null)" == "tmpfs" ]; then
-	TMPDIR_MOUNT="/run/shm"
+elif [ "$(findmnt -no fstype -T /tmp-phpunit 2>/dev/null)" == "tmpfs" ]; then
+	TMPDIR_MOUNT="/tmp-phpunit"
 else
 	TMPDIR_MOUNT="/tmp"
 	echo "Temporary directory is not a tmpfs; tests might be slow" >&2

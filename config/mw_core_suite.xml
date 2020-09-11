@@ -8,6 +8,7 @@
 	convertNoticesToExceptions="true"
 	convertWarningsToExceptions="true"
 	forceCoversAnnotation="true"
+	failOnWarning="true"
 	stopOnFailure="false"
 	failOnRisky="true"
 	beStrictAboutTestsThatDoNotTestAnything="true"

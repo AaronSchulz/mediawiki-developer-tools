@@ -1,25 +1,31 @@
 #!/usr/bin/env bash
 
+if [ -z "${DEV_MW_DIR}" ]; then
+	echo "DEV_MW_DIR (IDE mediawiki directory) is not set"
+	exit 1;
+elif [ -z "${SRV_MW_DIR}" ]; then
+	echo "SRV_MW_DIR (webserver mediawiki directory) is not set"
+	exit 1;
+fi
+
 # Variables that depend on the OS that owns the "development" MediaWiki directory
-if [[ -d "/mnt/c/WINDOWS/System32" ]]; then
+if [ -d "/mnt/c/WINDOWS/System32" ]; then
+	WSL_MODE=1
 	if [ ! -f "/mnt/c/Program Files/Git/bin/git.exe" ]; then
 		echo "Could not detect Git for Windows (https://git-scm.com/download/win)"
 		exit 1
 	fi
-	DEV_OS_CUR_USER=$("/mnt/c/WINDOWS/system32/whoami.exe" | grep -Po '[^\\]+$' | tr -d '\r')
 	# ~/bin/find only picks the executable based on $PWD, not the path arguments to "find"
 	DEV_OS_FIND_BIN="/mnt/c/Program Files/Git/usr/bin/find.exe"
 else
-	DEV_OS_CUR_USER=$(whoami)
-	DEV_OS_FIND_BIN="find"
+	WSL_MODE=
+	DEV_OS_FIND_BIN="/bin/find"
 fi
 # Customizable "development" base MediaWiki directory (used by IDE)
-DEV_MW_DIR=${DEV_MW_DIR:-"/mnt/c/Users/${DEV_OS_CUR_USER}/PhpstormProjects/mediawiki"}
 DEV_MW_CORE="${DEV_MW_DIR}/core"
 DEV_MW_SKINS="${DEV_MW_DIR}/skins"
 DEV_MW_EXTENSIONS="${DEV_MW_DIR}/extensions"
 # Customizable "server" base MediaWiki directory (used by web server)
-SRV_MW_DIR=${SRV_MW_DIR:-"/srv/mediawiki"}
 SRV_MW_CORE="${SRV_MW_DIR}/core"
 SRV_MW_SKINS="${SRV_MW_DIR}/skins"
 SRV_MW_EXTENSIONS="${SRV_MW_DIR}/extensions"
@@ -33,15 +39,15 @@ declare -i PROCESSORS
 PROCESSORS=$(nproc)
 
 if [ "$(whoami)" != "${SRV_USER}" ]; then
-	echo "Script must be run as user: ${SRV_USER}"
+	echo "Script must be run as user '${SRV_USER}'"
 	exit 1
 fi
 
 if [ ! -d "${DEV_MW_DIR}" ]; then
-	echo "${DEV_MW_DIR} does not exist"
+	echo "DEV_MW_DIR (${DEV_MW_DIR}) does not exist"
 	exit 1
 elif [ ! -w "${SRV_MW_DIR}" ]; then
-	echo "${SRV_MW_DIR} does not exist or is not writable"
+	echo "SRV_MW_DIR (${SRV_MW_DIR}) does not exist or is not writable"
 	exit 1
 fi
 
@@ -153,7 +159,13 @@ function prestat_dir_projects() {
 	shift 2
 	local PROJECT_NAMES=("$@")
 
-	local SRC_WITHOUT_MNT_PREFIX="${SRC/#\/mnt\//\/}"
+	# Git for Windows uses "/c/" instead of "/mnt/c/"
+	local DEV_OS_SRC
+	if [ -n "${WSL_MODE}" ]; then
+		DEV_OS_SRC="${SRC/#\/mnt\//\/}"
+	else
+		DEV_OS_SRC="${SRC}"
+	fi
 	local SRC_PROJECT DST_PROJECT FILE_PATH CODE=0
 
 	# Initialize a NULL last-modified timestamp for each NTFS file to stat
@@ -169,23 +181,21 @@ function prestat_dir_projects() {
 		MTIME_CACHE["${DST_PROJECT}/vendor"]=""
 		MTIME_CACHE["${DST_PROJECT}/node_modules"]=""
 	done
-
 	# Preload the last-modified timestamp for each of these source files that exist
 	while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
 		FILE_PATH="${SRC}/${relative_path}"
 		#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
 		MTIME_CACHE[$FILE_PATH]="${last_modified}"
 	done < <(
-		"${DEV_OS_FIND_BIN}" "${SRC_WITHOUT_MNT_PREFIX}" \
+		"${DEV_OS_FIND_BIN}" "${DEV_OS_SRC}" \
 		-mindepth 2 -maxdepth 3 \( \
-			-path "\*/.git/index" -o \
-			-path "\*/vendor" -o \
-			-path "\*/node_modules" -o \
-			-path "\*/IGNORE" \
+			-path '*/.git/index' -o \
+			-path '*/vendor' -o \
+			-path '*/node_modules' -o \
+			-path '*/IGNORE' \
 		\) -printf "%P|${MTIME_FORMAT}\n"
 	)
 	[[ $CODE -eq 0 ]] || exit 2
-
 	# Preload the last-modified timestamp for each of these destination files that exist
 	while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
 		FILE_PATH="${DST}/${relative_path}"
@@ -193,9 +203,11 @@ function prestat_dir_projects() {
 		MTIME_CACHE[$FILE_PATH]="${last_modified}"
 	done < <(
 		find "${DST}" \
-		-mindepth 2 -maxdepth 3 \
-		\( -path "*/.git/index" -o -path "*/vendor" -o -path "*/node_modules" \) \
-		-printf "%P|${MTIME_FORMAT}\n"
+		-mindepth 2 -maxdepth 3 \( \
+			-path "*/.git/index" -o \
+			-path "*/vendor" -o \
+			-path "*/node_modules" \
+		\) -printf "%P|${MTIME_FORMAT}\n"
 	)
 	[[ $CODE -eq 0 ]] || exit 2
 }
@@ -219,6 +231,7 @@ function file_mtime() {
 
 	if [[ -v MTIME_CACHE[$FILE_PATH] ]]; then
 		MTIME="${MTIME_CACHE[$FILE_PATH]}"
+		#echo "StatHit [${FILE_PATH}] = ${MTIME}" >&2
 	else
 		# Note that find.exe is slower here than /usr/bin/find
 		MTIME=$(find "${FILE_PATH}" -maxdepth 0 -printf "${MTIME_FORMAT}\n" 2>/dev/null)

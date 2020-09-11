@@ -1,6 +1,25 @@
 # mediawiki-developer-tools
 A collection of utilities for assisting basic MediaWiki development tasks
 
+## Environmental variable setup ##
+
+These tools assume that there is a "mediawki" directory (DEV_MW_DIR), used directly by an IDE,
+for making changes and that this directory contains the following subdirectories:
+* core: git checkout of mediawiki/core
+* skins: directory of git checkouts of mediawiki/skin/*
+* extensions: directory of git checkouts of mediawiki/extensions/*
+
+These tools assume that there is another "mediawki" directory (SRV_MW_DIR), used by a webserver,
+for testing changes made in the IDE. This directory must be synchronized prior to each attempt to
+test functionality or run unit tests against it. 
+
+Set DEV_MW_DIR and SRV_MW_DIR in ~/.bashrc (or similar).
+
+<code>
+export DEV_MW_DIR=/home/aaron/PhpstormProjects/mediawiki
+export SRV_MW_DIR=/srv/mediawiki
+</code>
+
 ## Win32/Linux command wrappers ##
 A set of programs useful for making WSL faster by avoiding 9P file system I/O. They work by deciding 
 which binary to use based on the current working directory. They do not carefully inspect the program
