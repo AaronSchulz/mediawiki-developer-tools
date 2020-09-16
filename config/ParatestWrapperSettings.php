@@ -32,8 +32,7 @@ if ( $wgDBtype === 'sqlite' && !is_array( $wgDBservers ) ) {
 		'user' => $wgDBuser,
 		'password' => $wgDBpassword,
 		'dbDirectory' => $wgSQLiteDataDir,
-		'type' => $wgDBtype,
-		'load' => 100
+		'type' => $wgDBtype
 	] ];
 }
 if ( is_array( $wgDBservers ) ) {
@@ -51,6 +50,7 @@ if ( is_array( $wgDBservers ) ) {
 		$wgDBservers[$i]['dbDirectory'] = $wgTmpDirectory;
 		$wgDBservers[$i]['variables']['temp_store'] = 'MEMORY';
 		$wgDBservers[$i]['variables']['synchronous'] = 'OFF';
+		$wgDBservers[$i]['variables']['journal_mode'] = 'MEMORY';
 	}
 }
 
