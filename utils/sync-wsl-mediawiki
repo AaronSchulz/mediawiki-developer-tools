@@ -159,13 +159,6 @@ function prestat_dir_projects() {
 	shift 2
 	local PROJECT_NAMES=("$@")
 
-	# Git for Windows uses "/c/" instead of "/mnt/c/"
-	local DEV_OS_SRC
-	if [ -n "${WSL_MODE}" ]; then
-		DEV_OS_SRC="${SRC/#\/mnt\//\/}"
-	else
-		DEV_OS_SRC="${SRC}"
-	fi
 	local SRC_PROJECT DST_PROJECT FILE_PATH CODE=0
 
 	# Initialize a NULL last-modified timestamp for each NTFS file to stat
@@ -182,19 +175,36 @@ function prestat_dir_projects() {
 		MTIME_CACHE["${DST_PROJECT}/node_modules"]=""
 	done
 	# Preload the last-modified timestamp for each of these source files that exist
-	while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
-		FILE_PATH="${SRC}/${relative_path}"
-		#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
-		MTIME_CACHE[$FILE_PATH]="${last_modified}"
-	done < <(
-		"${DEV_OS_FIND_BIN}" "${DEV_OS_SRC}" \
-		-mindepth 2 -maxdepth 3 \( \
-			-path '*/.git/index' -o \
-			-path '*/vendor' -o \
-			-path '*/node_modules' -o \
-			-path '*/IGNORE' \
-		\) -printf "%P|${MTIME_FORMAT}\n"
-	)
+	if [ -n "${WSL_MODE}" ]; then
+		# Git for Windows uses "/c/" instead of "/mnt/c/" and a different escape character
+		while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
+			FILE_PATH="${SRC}/${relative_path}"
+			#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
+			MTIME_CACHE[$FILE_PATH]="${last_modified}"
+		done < <(
+			"${DEV_OS_FIND_BIN}" "${SRC/#\/mnt\//\/}" \
+			-mindepth 2 -maxdepth 3 \( \
+				-path "\*/.git/index" -o \
+				-path "\*/vendor" -o \
+				-path "\*/node_modules" -o \
+				-path "\*/IGNORE" \
+			\) -printf "%P|${MTIME_FORMAT}\n"
+		)
+	else
+		while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
+			FILE_PATH="${SRC}/${relative_path}"
+			#echo "StatLoad [${FILE_PATH}] = ${last_modified}"
+			MTIME_CACHE[$FILE_PATH]="${last_modified}"
+		done < <(
+			"${DEV_OS_FIND_BIN}" "${SRC}" \
+			-mindepth 2 -maxdepth 3 \( \
+				-path '*/.git/index' -o \
+				-path '*/vendor' -o \
+				-path '*/node_modules' -o \
+				-path '*/IGNORE' \
+			\) -printf "%P|${MTIME_FORMAT}\n"
+		)
+	fi
 	[[ $CODE -eq 0 ]] || exit 2
 	# Preload the last-modified timestamp for each of these destination files that exist
 	while IFS=$'|\n' read -r relative_path last_modified && CODE=$?; do
@@ -204,9 +214,9 @@ function prestat_dir_projects() {
 	done < <(
 		find "${DST}" \
 		-mindepth 2 -maxdepth 3 \( \
-			-path "*/.git/index" -o \
-			-path "*/vendor" -o \
-			-path "*/node_modules" \
+			-path '*/.git/index' -o \
+			-path '*/vendor' -o \
+			-path '*/node_modules' \
 		\) -printf "%P|${MTIME_FORMAT}\n"
 	)
 	[[ $CODE -eq 0 ]] || exit 2
