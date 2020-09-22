@@ -377,7 +377,8 @@ function get_upstream_extensions_wmf() {
 	# shellcheck disable=SC2016
 	curl -sL "${WMF_EXTS_URL}" |
 		grep -P '^\$IP/extensions/[^/]+/[^/]+$' |
-		awk -F/ '{print $3}'
+		awk -F/ '{print $3}' |
+		sort -u
 }
 
 function get_upstream_extensions_all() {
