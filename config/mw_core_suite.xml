@@ -15,8 +15,12 @@
 	beStrictAboutOutputDuringTests="true"
 	verbose="false">
 	<testsuites>
-		<testsuite name="includes-api">
+		<testsuite name="includes-api-query">
+			<directory>includes/api/query</directory>
+		</testsuite>
+		<testsuite name="includes-api-other">
 			<directory>includes/api</directory>
+			<exclude>includes/api/query</exclude>
 		</testsuite>
 		<testsuite name="includes-auth">
 			<directory>includes/auth</directory>
@@ -81,8 +85,14 @@
 		<testsuite name="includes-session">
 			<directory>includes/session</directory>
 		</testsuite>
+		<testsuite name="includes-shell">
+			<directory>includes/shell</directory>
+		</testsuite>
 		<testsuite name="includes-site">
 			<directory>includes/site</directory>
+		</testsuite>
+		<testsuite name="includes-specials">
+			<directory>includes/specials</directory>
 		</testsuite>
 		<testsuite name="includes-storage">
 			<directory>includes/Storage</directory>
@@ -126,7 +136,9 @@
 			<exclude>includes/Revision</exclude>
 			<exclude>includes/search</exclude>
 			<exclude>includes/session</exclude>
+			<exclude>includes/shell</exclude>
 			<exclude>includes/site</exclude>
+			<exclude>includes/specials</exclude>
 			<exclude>includes/Storage</exclude>
 			<exclude>includes/title</exclude>
 			<exclude>includes/upload</exclude>
