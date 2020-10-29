@@ -19,7 +19,7 @@ if [ -d "/mnt/c/WINDOWS/System32" ]; then
 	DEV_OS_FIND_BIN="/mnt/c/Program Files/Git/usr/bin/find.exe"
 else
 	WSL_MODE=
-	DEV_OS_FIND_BIN="/bin/find"
+	DEV_OS_FIND_BIN="find"
 fi
 # Customizable "development" base MediaWiki directory (used by IDE)
 DEV_MW_CORE="${DEV_MW_DIR}/core"
@@ -251,7 +251,7 @@ function file_mtime() {
 	echo "${MTIME}"
 }
 
-mkdir -p "${DEV_MW_DIR}" "${SRV_MW_SKINS}" "${SRV_MW_EXTENSIONS}" || exit 1
+mkdir -p "${SRV_MW_DIR}" "${SRV_MW_SKINS}" "${SRV_MW_EXTENSIONS}" || exit 1
 
 set -m
 trap "wait && exit" INT
