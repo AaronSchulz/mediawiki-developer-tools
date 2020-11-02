@@ -440,7 +440,7 @@ function git_command_all() {
 	"update")
 		COMMAND='cmd_update_remote'
 		;;
-	"pull")
+	"sync")
 		COMMAND='cmd_sync_origin_master'
 		;;
 	"commit")
