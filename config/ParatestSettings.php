@@ -1,5 +1,13 @@
 <?php
 
+if ( getenv( 'TMPDIR' ) === false ) {
+    echo( "TMPDIR was not set by paratest wrapper" );
+    die( 1 );
+} elseif ( getenv( 'TEST_TOKEN' ) === false ) {
+    echo( "TEST_TOKEN was not set by paratest wrapper" );
+    die( 1 );
+}
+
 require __DIR__ . '/LocalSettings.php';
 
 /**

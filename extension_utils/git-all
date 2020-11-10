@@ -20,7 +20,7 @@ if [ "$DIRECTORY" != "extensions" ]; then
 fi
 
 function print_usage() {
-	echo "Usage: ${SCRIPT_BASENAME} <pull|commit|push|reset|review|reset> [message]"
+	echo "Usage: ${SCRIPT_BASENAME} <sync|commit|push|reset|review|reset> [message]"
 }
 
 function cmd_update_remote() {

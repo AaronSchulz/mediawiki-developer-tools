@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-WSL_CORE="/srv/mediawiki/core"
 REAL_PATH=$(realpath "$0")
 CORE_UTILS_DIR=$(dirname "$REAL_PATH")
 BASE_DIR=$(dirname "$CORE_UTILS_DIR")
@@ -12,17 +11,17 @@ shift 1
 declare -a ARGS=("$@")
 
 function print_usage() {
-    echo "Usage: ${SCRIPT_BASENAME} <dev|srv|srv_parallel>"
+	echo "Usage: ${SCRIPT_BASENAME} <dev_phpunit|dev_paratest|srv_phpunit|srv_paratest>"
 }
 
 function prepare_tmpfs_temp_dir() {
-    local TMPDIR_MOUNT=$1
-    local TMPDIR_MEDIAWIKI="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
+	local TMPDIR_MOUNT=$1
+	local TMPDIR_MEDIAWIKI="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
 
-    if [ ! -d "${TMPDIR_MOUNT}" ]; then
-        echo "Invalid temp file mount path: ${TMPDIR_MOUNT}" >&2
-        exit 127
-    fi
+	if [ ! -d "${TMPDIR_MOUNT}" ]; then
+		echo "Invalid temp file mount path: ${TMPDIR_MOUNT}" >&2
+		exit 127
+	fi
 
 	echo -n "Clearing '${TMPDIR_MEDIAWIKI}'..."
 	sudo -u www-data mkdir -p "${TMPDIR_MEDIAWIKI}"
@@ -30,61 +29,62 @@ function prepare_tmpfs_temp_dir() {
 	echo "done"
 }
 
-function sync_wsl_mediawiki_dir() {
-    # Make sure ~/bin/git is used for Linux/WIN32 executable selection
-    sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR "${BASE_DIR}/utils/sync-wsl-mediawiki"
+function sync_wsl_MW_CORE_DIR() {
+	# Make sure ~/bin/git is used for Linux/WIN32 executable selection
+	sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR "${BASE_DIR}/utils/sync-wsl-mediawiki"
 }
 
 function execute_mediawiki_phpunit() {
-    local MEDIAWIKI_DIR=$1
-    local TMPFS_DIR=$2
+	local MW_CORE_DIR=$1
+	local TMPFS_DIR=$2
 
-    (
-    	set -e
+	(
+		set -e
+		cd "$MW_CORE_DIR"
 
-        cd "$MEDIAWIKI_DIR"
-        exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H php "${PHP_ARGS[@]}" \
-        	"./tests/phpunit/phpunit.php" \
-        	--colors=always \
-        	"${ARGS[@]}" 2>&1
-    )
+		exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H php "${PHP_ARGS[@]}" \
+			"./tests/phpunit/phpunit.php" \
+			--colors=always \
+			"${ARGS[@]}" 2>&1
+	)
 }
 
 function execute_mediawiki_paratest() {
-    local MEDIAWIKI_DIR=$1
-    local TMPFS_DIR=$2
-    local PARATEST_BIN=""
+	local MW_CORE_DIR=$1
+	local TMPFS_DIR=$2
+	local PARATEST_BIN=""
 
-    PARATEST_BIN=$(which paratest)
-    if [ -z "${PARATEST_BIN}" ]; then
-    	echo "Could not find paratest; is composer/vendor/bin in PATH?"
-    	exit 1
+	PARATEST_BIN=$(which paratest)
+	if [ -z "${PARATEST_BIN}" ]; then
+		echo "Could not find paratest; is composer/vendor/bin in PATH?"
+		exit 1
 	fi
 
-    (
-    	set -e
+	(
+		set -e
+		cd "$MW_CORE_DIR"
 
-        cd "$MEDIAWIKI_DIR"
+		# XXX: ugly work-around poorly divided suites
+		if [ "${BASE_DIR}/config/mw_core_suite.xml" -nt "./tests/phpunit/mw_core_suite.xml" ]; then
+			sudo -u www-data -H cp "${BASE_DIR}/config/mw_core_suite.xml" "./tests/phpunit/"
+		fi
 
-        # XXX: ugly work-around poorly divided suites
-        if [ "${BASE_DIR}/config/mw_core_suite.xml" -nt "./tests/phpunit/mw_core_suite.xml" ]; then
-            sudo -u www-data -H cp "${BASE_DIR}/config/mw_core_suite.xml" "./tests/phpunit/"
-        fi
 		# XXX: work around sqlite DB concurrency limitations
-        if [ "${BASE_DIR}/config/ParatestWrapperSettings.php" -nt "./ParatestWrapperSettings.php" ]; then
-            sudo -u www-data -H cp "${BASE_DIR}/config/ParatestWrapperSettings.php" "./"
-        fi
+		if [ "${BASE_DIR}/config/ParatestSettings.php" -nt "./ParatestSettings.php" ]; then
+			sudo -u www-data -H cp "${BASE_DIR}/config/ParatestSettings.php" "./"
+		fi
 
-        exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H "${PARATEST_BIN}" \
-            --phpunit="tests/phpunit/phpunit.php" \
-            --configuration="tests/phpunit/mw_core_suite.xml" \
-            --bootstrap="${BASE_DIR}/config/dummy.php" \
-            --parallel-suite \
-            --runner Runner \
-            --colors \
-            --passthru-php="${PHP_ARGS[*]}" \
-            --passthru="--conf=ParatestWrapperSettings.php --colors=always ${ARGS[*]}" 2>&1
-    )
+		# XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
+		# Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
+		# paratest a dummy bootstrap file in order to avoid shutdown warnings.
+		exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H "${PARATEST_BIN}" \
+			--phpunit="tests/phpunit/phpunit.php" \
+			--configuration="tests/phpunit/mw_core_suite.xml" \
+			--bootstrap="${BASE_DIR}/config/dummy.php" \
+			--parallel-suite \
+			--passthru-php="${PHP_ARGS[*]}" \
+			--passthru="--conf=ParatestSettings.php ${ARGS[*]}" 2>&1
+	)
 }
 
 declare TMPDIR_MOUNT
@@ -110,29 +110,40 @@ if [ -d /opcache/php ]; then
 	PHP_ARGS+=("-d opcache.file_cache_only=1")
 fi
 
-# Note that the "development path" just means $PWD
+# Note that the "development path" just means $PWD in this context.
+# This allows for easy testing of multiple checkouts of MediaWiki.
 case $COMMAND in
-"dev" | "")
-    prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-    execute_mediawiki_phpunit . "${TMPDIR_MOUNT}" | less -R
-    ;;
-"dev_parallel")
-    prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-    execute_mediawiki_paratest . "${TMPDIR_MOUNT}" | less -R
-    ;;
-"srv")
-    sync_wsl_mediawiki_dir || exit $?
-    prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-    execute_mediawiki_phpunit "${WSL_CORE}" "${TMPDIR_MOUNT}" | less -R
-    ;;
-"srv_parallel")
-    sync_wsl_mediawiki_dir || exit $?
-    prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-    execute_mediawiki_paratest "${WSL_CORE}" "${TMPDIR_MOUNT}" | less -R
-    ;;
+"dev_phpunit")
+	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	execute_mediawiki_phpunit . "${TMPDIR_MOUNT}" | less -R
+	;;
+"dev_paratest")
+	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	execute_mediawiki_paratest . "${TMPDIR_MOUNT}" | less -R
+	;;
+"srv_phpunit")
+	if [ -z "${SRV_MW_DIR}" ]; then
+		echo "SRV_MW_DIR (webserver mediawiki directory) is not set"
+		exit 1
+	fi
+	SRV_MW_CORE="${SRV_MW_DIR}/core"
+	sync_wsl_MW_CORE_DIR || exit $?
+	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	execute_mediawiki_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" | less -R
+	;;
+"srv_paratest")
+	if [ -z "${SRV_MW_DIR}" ]; then
+		echo "SRV_MW_DIR (webserver mediawiki directory) is not set"
+		exit 1
+	fi
+	SRV_MW_CORE="${SRV_MW_DIR}/core"
+	sync_wsl_MW_CORE_DIR || exit $?
+	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	execute_mediawiki_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" | less -R
+	;;
 *)
-    echo "Invalid command: ${COMMAND}" >&2
-    print_usage
-    exit 127
-    ;;
+	echo "Invalid command: ${COMMAND}" >&2
+	print_usage
+	exit 127
+	;;
 esac
