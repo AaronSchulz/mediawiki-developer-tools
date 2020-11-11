@@ -40,9 +40,9 @@
 		<testsuite name="includes-db">
 			<directory>includes/db</directory>
 		</testsuite>
-        <testsuite name="includes-debug">
-            <directory>includes/debug</directory>
-        </testsuite>
+		<testsuite name="includes-debug">
+			<directory>includes/debug</directory>
+		</testsuite>
 		<testsuite name="includes-deferred">
 			<directory>includes/deferred</directory>
 		</testsuite>
@@ -76,9 +76,9 @@
 		<testsuite name="includes-permissions">
 			<directory>includes/Permissions</directory>
 		</testsuite>
-        <testsuite name="includes-preferences">
-            <directory>includes/preferences</directory>
-        </testsuite>
+		<testsuite name="includes-preferences">
+			<directory>includes/preferences</directory>
+		</testsuite>
 		<testsuite name="includes-resourceloader">
 			<directory>includes/resourceloader</directory>
 		</testsuite>
@@ -127,7 +127,7 @@
 			<exclude>includes/changetags</exclude>
 			<exclude>includes/content</exclude>
 			<exclude>includes/db</exclude>
-            <exclude>includes/debug</exclude>
+			<exclude>includes/debug</exclude>
 			<exclude>includes/deferred</exclude>
 			<exclude>includes/externalstore</exclude>
 			<exclude>includes/filebackend</exclude>
@@ -139,7 +139,7 @@
 			<exclude>includes/page</exclude>
 			<exclude>includes/parser</exclude>
 			<exclude>includes/Permissions</exclude>
-            <exclude>includes/preferences</exclude>
+			<exclude>includes/preferences</exclude>
 			<exclude>includes/resourceloader</exclude>
 			<exclude>includes/Revision</exclude>
 			<exclude>includes/search</exclude>
@@ -226,6 +226,6 @@
 		</listener>
 	</listeners>
 	<extensions>
-	    <extension class="MediaWikiLoggerPHPUnitExtension" />
-    </extensions>
+		<extension class="MediaWikiLoggerPHPUnitExtension" />
+	</extensions>
 </phpunit>
