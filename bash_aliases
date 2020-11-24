@@ -13,12 +13,15 @@ function yubireset() {
 
 # git
 alias fast_git='~/bin/git'
-alias gdiff='fast_git diff -U20 --color=always'
-alias gvdiff='fast_git difftool -yd --color=always'
-alias gshow='fast_git show -U20 --color=always'
-alias gvlastdiff='fast_git difftool -yd --color=always HEAD^1..HEAD'
-alias gstatus='fast_git status'
 alias glog='fast_git log --dirstat --decorate --color=always'
+alias gstatus='fast_git status'
+alias gdiffunstaged='fast_git diff -U20 --color=always'
+alias gvdiffunstaged='fast_git difftool -yd --color=always'
+alias gdiffstaged='fast_git diff -U20 --cached --color=always'
+alias gvdiffstaged='fast_git difftool --cached -yd --color=always'
+alias gdiffhead='fast_git diff -U20 --color=always HEAD^1..HEAD'
+alias gvdiffhead='fast_git difftool -yd --color=always HEAD^1..HEAD'
+alias gshow='fast_git show -U20 --color=always'
 alias gremoteupdate='fast_git fetch --all'
 alias grebasemaster='fast_git rebase origin/master'
 alias grebasecontinue='fast_git rebase --continue'
@@ -28,7 +31,6 @@ alias gsyncprod='fast_git remote update && fast_git reset --hard origin/producti
 alias gadd='fast_git add --interactive'
 alias gcommit='fast_git commit'
 alias gamend='fast_git commit -a --amend'
-alias gphpcs='fast_git diff --name-only --oneline origin/master..HEAD | xargs -d '\n' phpcs -p -s'
 
 # git-review
 alias smart_git-review='~/bin/git-review'
@@ -39,6 +41,9 @@ alias grdownload='smart_git-review -d $1'
 
 # git/svn convenience
 alias grep='grep --exclude-dir=".git" --exclude-dir=".svn"'
+
+# git-based convenience
+alias gphpcs='fast_git diff --name-only --oneline origin/master..HEAD | xargs -d '\n' phpcs -p -s'
 
 # Win32 command locator (useful if ugly W10/WSL $PATH sharing is disable)
 alias winwhere="/mnt/c/Windows/System32/where.exe"
