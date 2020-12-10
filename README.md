@@ -107,17 +107,19 @@ The must be run in a folder called "extensions" that contains the extension repo
 * grep-wmf: searches only extensions enabled on Wikimedia productions sites and groups output by repo 
 
 ## Other utilities ##
+A set of programs that can be run from anywhere.
+
+* sync-srv-mediawiki: This is a fast git/rsync based script to syncronize the MediaWiki directory used for serving content
+with the one used by your IDE(s) for development. This is mostly useful when the server runs inside
+WSL (with native file system access) but the IDE runs as a Win32 app that needs to heavily watch, stat,
+and read thousands of files (requiring native file system access).
+
 These programs can be enabled by creating symlinks within the "~/bin" folder, e.g.:
 
 <code>
 mkdir -p ~/bin
 ln -s /path/to/mediawiki-developer-tools/utils/* ~/bin/
 </code>
-
-* sync-wsl-mediawiki: This is a fast git/rsync based script to syncronize the MediaWiki directory used for serving content
-with the one used by your IDE(s) for development. This is mostly useful when the server runs inside
-WSL (with native file system access) but the IDE runs as a Win32 app that needs to heavily watch, stat,
-and read thousands of files (requiring native file system access).
 
 ## Convenience aliases for Bash ##
 The bash_aliases script contains convenient shell terminal aliases for running common commands, e.g:

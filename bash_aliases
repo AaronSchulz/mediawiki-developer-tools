@@ -52,7 +52,7 @@ alias winwhere="/mnt/c/Windows/System32/where.exe"
 alias wphp='sudo -u www-data php -d opcache.file_cache=/opcache/php7 -d opcache.file_cache_only=1'
 
 # Convenience wrapper to synchronize /srv/mediawiki with PhpStormProjects/mediawiki
-alias syncwsl="sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR ${HOME}/bin/sync-wsl-mediawiki"
+alias syncsrvmediawiki="sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR ${HOME}/bin/sync-srv-mediawiki"
 
 # Convenience launchers for common editors
 function pnotepad {
