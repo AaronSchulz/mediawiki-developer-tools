@@ -1,0 +1,43 @@
+#!/bin/bash
+
+PROPOSED_BASE=$1
+CURRENT_BASE=$2
+PROPOSED=$3
+
+echo "Resolving changelog conflict ..."
+
+NAIVE_UNION_MERGE=1
+PROPOSED_MUTATIONS=$(git diff --no-index --numstat "${PROPOSED_BASE}" "${PROPOSED}" | cut -f2)
+if [[ $PROPOSED_MUTATIONS -ne 0 ]]; then
+	NAIVE_UNION_MERGE=0
+	echo "WARNING: proposed modifications to existing lines"
+fi
+
+CURRENT_MUTATIONS=$(git diff --no-index --numstat "${PROPOSED_BASE}" "${CURRENT_BASE}" | cut -f2)
+if [[ $CURRENT_MUTATIONS -ne 0 ]]; then
+	NAIVE_UNION_MERGE=0
+	echo "WARNING: upstream modifications to existing lines"
+fi
+
+diff -au "${PROPOSED_BASE}" "${PROPOSED}" | patch --merge "${CURRENT_BASE}"
+EXIT_CODE=$?
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+	echo "resolved: ${CURRENT_BASE}"
+elif [[ $EXIT_CODE -eq 1 ]]; then
+	if [[ $NAIVE_UNION_MERGE -eq 1 ]]; then
+		grep -vP "<<<<<<<|=======|>>>>>>>" "${CURRENT_BASE}" > "${CURRENT_BASE}.union" &&
+		mv "${CURRENT_BASE}.union" "${CURRENT_BASE}" &&
+		echo "resolved via union: ${CURRENT_BASE}"
+	else
+		echo "unresolved merge conflicts: ${CURRENT_BASE}"
+	fi
+else
+	echo "serious patch error: ${EXIT_CODE}"
+fi
+
+echo "---------"
+cat "${CURRENT_BASE}"
+echo ""
+
+exit $EXIT_CODE
