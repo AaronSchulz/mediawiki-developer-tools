@@ -55,8 +55,8 @@ function execute_mediawiki_paratest() {
 	local PARATEST_BIN=""
 	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 
-	PARATEST_BIN=$(which paratest)
-	if [ -z "${PARATEST_BIN}" ]; then
+	PARATEST_BIN="${HOME}/.config/composer/vendor/bin/paratest"
+	if [ ! -x "${PARATEST_BIN}" ]; then
 		echo "Could not find paratest; is composer/vendor/bin in PATH?"
 		exit 1
 	fi
@@ -86,7 +86,7 @@ function execute_mediawiki_paratest() {
 			--bootstrap="${BASE_DIR}/config/dummy.php" \
 			--parallel-suite \
 			--passthru-php="${PHP_ARGS[*]}" \
-			--passthru="--reuse-db ${ARGS[*]}"
+			--passthru="${ARGS[*]}"
 	)
 }
 

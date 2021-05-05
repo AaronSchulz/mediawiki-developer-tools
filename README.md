@@ -62,7 +62,7 @@ ln -s /path/to/mediawiki-developer-tools/core_utils/* .
 
 The test runners depends on paratest, which can be installed via:
 <code>
-composer global require --dev brianium/paratest
+composer.phar global require brianium/paratest ^5.0.4
 </code>
 
 ## Mediawiki extension utilities ##
