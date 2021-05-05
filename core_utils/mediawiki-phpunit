@@ -53,6 +53,7 @@ function execute_mediawiki_paratest() {
 	local MW_CORE_DIR=$1
 	local TMPFS_DIR=$2
 	local PARATEST_BIN=""
+	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 
 	PARATEST_BIN=$(which paratest)
 	if [ -z "${PARATEST_BIN}" ]; then
@@ -66,24 +67,26 @@ function execute_mediawiki_paratest() {
 
 		# XXX: ugly work-around poorly divided suites
 		if [ "${BASE_DIR}/config/mw_core_suite.xml" -nt "./tests/phpunit/mw_core_suite.xml" ]; then
-			sudo -u www-data -H cp "${BASE_DIR}/config/mw_core_suite.xml" "./tests/phpunit/"
+			sudo -u www-data -H cp "${BASE_DIR}/config/mw_core_suite.xml" "./tests/phpunit/" || exit $?
+
 		fi
 
 		# XXX: work around sqlite DB concurrency limitations
-		if [ "${BASE_DIR}/config/ParatestSettings.php" -nt "./ParatestSettings.php" ]; then
-			sudo -u www-data -H cp "${BASE_DIR}/config/ParatestSettings.php" "./"
+		if ! tail -1 './LocalSettings.php' | grep 'ParatestSettings.php' -q; then
+		  echo "ParatestSettings.php must be required in the last LocalSettings.php line"
+		  exit 1
 		fi
 
 		# XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
 		# Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
 		# paratest a dummy bootstrap file in order to avoid shutdown warnings.
-		exec sudo TMPDIR="${TMPFS_DIR}" -u www-data -H "${PARATEST_BIN}" \
+		exec sudo TMPDIR="${TMPDIR_MEDIAWIKI}" -u www-data -H "${PARATEST_BIN}" \
 			--phpunit="tests/phpunit/phpunit.php" \
 			--configuration="tests/phpunit/mw_core_suite.xml" \
 			--bootstrap="${BASE_DIR}/config/dummy.php" \
 			--parallel-suite \
 			--passthru-php="${PHP_ARGS[*]}" \
-			--passthru="--conf=ParatestSettings.php ${ARGS[*]}" 2>&1
+			--passthru="--reuse-db ${ARGS[*]}"
 	)
 }
 
@@ -115,11 +118,11 @@ fi
 case $COMMAND in
 "dev_phpunit")
 	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_phpunit . "${TMPDIR_MOUNT}" | less -R
+	execute_mediawiki_phpunit . "${TMPDIR_MOUNT}" 2>&1 | less -R
 	;;
 "dev_paratest")
 	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_paratest . "${TMPDIR_MOUNT}" | less -R
+	execute_mediawiki_paratest . "${TMPDIR_MOUNT}" 2>&1 | less -R
 	;;
 "srv_phpunit")
 	if [ -z "${SRV_MW_DIR}" ]; then
@@ -129,7 +132,7 @@ case $COMMAND in
 	SRV_MW_CORE="${SRV_MW_DIR}/core"
 	sync_srv_mediawiki || exit $?
 	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" | less -R
+	execute_mediawiki_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	;;
 "srv_paratest")
 	if [ -z "${SRV_MW_DIR}" ]; then
@@ -139,7 +142,7 @@ case $COMMAND in
 	SRV_MW_CORE="${SRV_MW_DIR}/core"
 	sync_srv_mediawiki || exit $?
 	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" | less -R
+	execute_mediawiki_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	;;
 *)
 	echo "Invalid command: ${COMMAND}" >&2
