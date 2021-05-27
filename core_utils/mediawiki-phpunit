@@ -48,7 +48,9 @@ function execute_mediawiki_phpunit() {
 
     # Preserve environmental variables used to select test backends
 		PRESERVE_ENV=$(get_preserved_variables)
-		echo "Preserved variables: ${PRESERVE_ENV}"
+		if [ -n "${PRESERVE_ENV}" ]; then
+		  echo "Environmental variables: ${PRESERVE_ENV}"
+		fi
 
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
 		  TMPDIR="${TMPFS_DIR}" php "${PHP_ARGS[@]}" \
@@ -89,7 +91,9 @@ function execute_mediawiki_paratest() {
 
     # Preserve environmental variables used to select test backends
 		PRESERVE_ENV=$(get_preserved_variables)
-		echo "Preserved variables: ${PRESERVE_ENV}"
+		if [ -n "${PRESERVE_ENV}" ]; then
+		  echo "Environmental variables detected: ${PRESERVE_ENV}"
+		fi
 
 		# XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
 		# Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
