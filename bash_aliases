@@ -12,40 +12,38 @@ function yubireset() {
 }
 
 # git
-alias fast_git='~/bin/git'
-alias glog='fast_git log --dirstat --decorate --color=always'
-alias gstatus='fast_git status'
-alias gdiff,iw='fast_git diff -U20 --color=always'
-alias gvdiff,iw='fast_git difftool --color=always -yd'
-alias gdiff,hi='fast_git diff -U20 --color=always --cached'
-alias gvdiff,hi='fast_git difftool --color=always --cached -yd'
-alias gdiff,oh='fast_git diff -U20 --color=always origin/HEAD..HEAD'
-alias gvdiff,oh='fast_git difftool -yd --color=always origin/HEAD..HEAD'
-alias gdiff,h='fast_git diff -U20 --color=always HEAD^1..HEAD'
-alias gvdiff,h='fast_git difftool --color=always -yd HEAD^1..HEAD'
-alias gshow='fast_git show -U20 --color=always'
-alias gremoteupdate='fast_git fetch --all'
-alias grebasemaster='fast_git fetch --all && fast_git rebase origin/master'
-alias grebasecontinue='fast_git rebase --continue'
-alias grebaseabort='fast_git rebase --abort'
-alias gsyncmaster='fast_git diff --exit-code --stat && fast_git remote update && fast_git reset --hard origin/master'
-alias gsyncprod='fast_git remote update && fast_git reset --hard origin/production'
-alias gadd='fast_git add --interactive'
-alias gcommit='fast_git commit'
-alias gamend='fast_git commit -a --amend'
+alias glog='~/bin/git log --dirstat --decorate --color=always'
+alias gstatus='~/bin/git status'
+alias gdiff,iw='~/bin/git diff -U20 --color=always'
+alias gvdiff,iw='~/bin/git difftool --color=always -yd'
+alias gdiff,hi='~/bin/git diff -U20 --color=always --cached'
+alias gvdiff,hi='~/bin/git difftool --color=always --cached -yd'
+alias gdiff,oh='~/bin/git diff -U20 --color=always origin/HEAD..HEAD'
+alias gvdiff,oh='~/bin/git difftool -yd --color=always origin/HEAD..HEAD'
+alias gdiff,h='~/bin/git diff -U20 --color=always HEAD^1..HEAD'
+alias gvdiff,h='~/bin/git difftool --color=always -yd HEAD^1..HEAD'
+alias gshow='~/bin/git show -U20 --color=always'
+alias gremoteupdate='~/bin/git fetch --all'
+alias grebasemaster='~/bin/git fetch --all && ~/bin/git rebase origin/master'
+alias grebasecontinue='~/bin/git rebase --continue'
+alias grebaseabort='~/bin/git rebase --abort'
+alias gsyncmaster='~/bin/git diff --exit-code --stat && ~/bin/git remote update && ~/bin/git reset --hard origin/master'
+alias gsyncprod='~/bin/git remote update && ~/bin/git reset --hard origin/production'
+alias gadd='~/bin/git add --interactive'
+alias gcommit='~/bin/git commit'
+alias gamend='~/bin/git commit -a --amend'
 
 # git-review
-alias smart_git-review='~/bin/git-review'
-alias grpush='smart_git-review -fR'
-alias grpushmaster='smart_git-review -R; if [ "$?" -eq 0 ]; then git reset --hard origin/master; fi'
-alias grpushprod='smart_git-review -R; if [ "$?" -eq 0 ]; then git reset --hard origin/production; fi'
-alias grdownload='smart_git-review -d $1'
+alias grpush='~/bin/git-review -fR'
+alias grpushmaster='~/bin/git-review -R; if [ "$?" -eq 0 ]; then git reset --hard origin/master; fi'
+alias grpushprod='~/bin/git-review -R; if [ "$?" -eq 0 ]; then git reset --hard origin/production; fi'
+alias grdownload='~/bin/git-review -d $1'
 
 # git/svn convenience
 alias grep='grep --exclude-dir=".git" --exclude-dir=".svn"'
 
 # git-based convenience
-alias gphpcs='fast_git diff --name-only --oneline origin/master..HEAD | xargs -d '\n' phpcs -p -s'
+alias gphpcs='~/bin/git diff --name-only --oneline origin/master..HEAD | xargs -d '\n' phpcs -p -s'
 
 # Win32 command locator (useful if ugly W10/WSL $PATH sharing is disable)
 alias winwhere="/mnt/c/Windows/System32/where.exe"
