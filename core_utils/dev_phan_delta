@@ -1,0 +1,2 @@
+#!/bin/bash
+mapfile -t FILES < <(git diff --name-only origin..HEAD) && for FILE in "${FILES}"; do "/home/aaron/.config/composer/vendor/bin/phan_client" -l "${FILE}"; done

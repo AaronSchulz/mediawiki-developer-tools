@@ -1,0 +1,2 @@
+#!/bin/sh
+git diff --name-only --oneline origin..HEAD | xargs -d '\n' composer phpcs
