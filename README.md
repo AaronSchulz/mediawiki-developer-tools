@@ -66,8 +66,10 @@ composer.phar global require brianium/paratest ^5.0.4
 </code>
 
 ## Mediawiki extension utilities ##
-A set of programs that can be run from an "extensions" directory that contains MediaWiki extension repos.
-This is not same directory as the one that appears under the "core" repo.
+A set of programs that can be run from either an "extensions" directory containing MediaWiki
+extension repos, or, a "skins" containing MediaWiki skin repos. These directories should not be 
+the same directories as the ones that appears under the "core" repo. The proper place for these
+directories is under the "mediawiki" directory.
 
 These programs can be enabled by creating symlinks within this extension folder, e.g.:
 

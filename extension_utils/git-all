@@ -1,26 +1,34 @@
 #!/usr/bin/env bash
 
-GERRIT_EXT_DIR="mediawiki/extensions/"
-GERRIT_SSH_URL="ssh://gerrit.wikimedia.org:29418"
-ALL_EXTS_URL="https://gerrit.wikimedia.org/r/projects/?format=text&b=master&p=mediawiki%2Fextensions%2F"
-WMF_EXTS_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
-GITTILES_URL="https://gerrit.wikimedia.org/r/plugins/gitiles"
+GERRIT_URL_SSH="ssh://gerrit.wikimedia.org:29418"
+GERRIT_URL_HTTPS="https://gerrit.wikimedia.org"
 
+# Note: this handles the case where the bash script is a symlink to the Git repo version
 SCRIPT_BASENAME=$(basename "$(realpath "$0")")
 DIRECTORY=$(basename "$(pwd -P)")
 
 OPERATION=$1
 SUMMARY=$2
 
-# Sanity check the working directory to avoid making Git checkout spam
-# Note: this handles the case where the bash script is a symlink to the Git repo version
-if [ "$DIRECTORY" != "extensions" ]; then
-	echo "${SCRIPT_BASENAME} must run in the 'extensions' directory" >&2
+if [ "$DIRECTORY" == "extensions" ]; then
+  GERRIT_EXT_DIR="mediawiki/extensions/"
+  EXTLIST_ALL_URL="${GERRIT_URL_HTTPS}/r/projects/?format=text&b=master&p=mediawiki%2Fextensions%2F"
+  EXTLIST_ALL_REGEX='^[a-f0-9]{40} mediawiki/extensions/[^/]+$'
+  EXTLIST_WMF_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
+  EXTLIST_WMF_REGEX='^\$IP/extensions/[^/]+/[^/]+$'
+elif [ "$DIRECTORY" == "skins" ]; then
+  GERRIT_EXT_DIR="mediawiki/skins/"
+  EXTLIST_ALL_URL="${GERRIT_URL_HTTPS}/r/projects/?format=text&b=master&p=mediawiki%2Fskins%2F"
+  EXTLIST_ALL_REGEX='^[a-f0-9]{40} mediawiki/skins/[^/]+$'
+  EXTLIST_WMF_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
+  EXTLIST_WMF_REGEX='^\$IP/skins/[^/]+/[^/]+$'
+else
+	echo "${SCRIPT_BASENAME} must run in the 'extensions' or 'skins' directory" >&2
 	exit 127
 fi
 
 function print_usage() {
-	echo "Usage: ${SCRIPT_BASENAME} <sync|commit|push|reset|review|reset> [message]"
+	echo "Usage: ${SCRIPT_BASENAME} <sync|commit|push|reset|review|gc> [message]"
 }
 
 function cmd_update_remote() {
@@ -50,7 +58,7 @@ function repo_init_update_remote() {
 		cd "./${REPO}"
 		git init -q
 		git config core.filemode false
-		git remote add origin "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
+		git remote add origin "${GERRIT_URL_SSH}/${GERRIT_EXT_DIR}${REPO}"
 		git remote update >/dev/null
 		git checkout master -fq
 		git submodule update --recursive --remote
@@ -96,7 +104,7 @@ function repo_clone_checkout_master() {
 		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
 		[[ "${BYPASSED}" -ne 1 ]] || exit 0
 
-		git clone "${GERRIT_SSH_URL}/${GERRIT_EXT_DIR}${REPO}"
+		git clone "${GERRIT_URL_SSH}/${GERRIT_EXT_DIR}${REPO}"
 
 		cd "./${REPO}"
 		git config core.filemode false
@@ -354,7 +362,7 @@ function repo_salt_if_archived() {
 
 function repo_bypass_creation_if_archived() {
 	local REPO=$1
-	local PREFIX="${GITTILES_URL}/${GERRIT_EXT_DIR}${REPO}/+/master/"
+	local PREFIX="${GERRIT_URL_HTTPS}/r/plugins/gitiles/${GERRIT_EXT_DIR}${REPO}/+/master/"
 	local FILES_CHECK=("${PREFIX}/ARCHIVED" "${PREFIX}/OBSOLETE" "${PREFIX}/OBSOLETE.txt")
 	(
 		set +e
@@ -375,17 +383,12 @@ function repo_bypass_creation_if_archived() {
 function get_upstream_extensions_wmf() {
 	# Exclude nested repositories for directory layout sanity
 	# shellcheck disable=SC2016
-	curl -sL "${WMF_EXTS_URL}" |
-		grep -P '^\$IP/extensions/[^/]+/[^/]+$' |
-		awk -F/ '{print $3}' |
-		sort -u
+	curl -sL "${EXTLIST_WMF_URL}" | grep -P "${EXTLIST_WMF_REGEX}" | awk -F/ '{print $3}' | sort -u
 }
 
 function get_upstream_extensions_all() {
 	# Exclude nested repositories for directory layout sanity
-	curl -sL "${ALL_EXTS_URL}" |
-		grep -P '^[a-f0-9]{40} mediawiki/extensions/[^/]+$' |
-		awk -F'[/ ]' '{print $1 "|" $4}'
+	curl -sL "${EXTLIST_ALL_URL}" | grep -P "${EXTLIST_ALL_REGEX}" | awk -F'[/ ]' '{print $1 "|" $4}'
 }
 
 function git_command_all() {
