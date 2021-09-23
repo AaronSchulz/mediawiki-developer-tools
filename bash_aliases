@@ -43,7 +43,7 @@ alias grdownload='~/bin/git-review -d $1'
 alias grep='grep --exclude-dir=".git" --exclude-dir=".svn"'
 
 # git-based convenience
-alias gphpcs='CSBIN="vendor/bin/phpcs"; if [ ! -x "${CSBIN}" ]; then CSBIN="phpcs"; fi; ~/bin/git diff --name-only --oneline --diff-filter=d origin..HEAD | xargs -d "\n" "${CSBIN}" -p -s'
+alias gphpcs='PHP_CS_BIN="vendor/bin/phpcs"; if [ ! -x "${PHP_CS_BIN}" ]; then PHP_CS_BIN="phpcs"; fi; ~/bin/git diff --name-only --oneline --diff-filter=d origin..HEAD | xargs -d "\n" "${PHP_CS_BIN}" -p -s'
 
 # Win32 command locator (useful if ugly W10/WSL $PATH sharing is disable)
 alias winwhere="/mnt/c/Windows/System32/where.exe"
