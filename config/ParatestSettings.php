@@ -15,7 +15,9 @@ function wfCloneSqliteSchemaForParatest( string $liveDbPath, string $cloneDbPath
         'r'
     );
     stream_get_contents( $proc );
-    pclose( $proc );
+    if ( pclose( $proc ) !== 0 ) {
+		throw new RuntimeException( "Failed to clone '$liveDbPath' schema to '$cloneDbPath'" );
+	}
 }
 
 function wfModifyConfigForParatest() {

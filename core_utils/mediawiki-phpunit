@@ -25,7 +25,7 @@ function prepare_tmpfs_temp_dir() {
 
 	echo -n "Clearing '${TMPDIR_MEDIAWIKI}'..."
 	sudo -u www-data mkdir -p "${TMPDIR_MEDIAWIKI}"
-	sudo -u www-data -H rm -rf "${TMPDIR_MEDIAWIKI}/*" || exit $?
+	sudo -u www-data rm -rf "${TMPDIR_MEDIAWIKI}/*" || exit $?
 	echo "done"
 }
 
