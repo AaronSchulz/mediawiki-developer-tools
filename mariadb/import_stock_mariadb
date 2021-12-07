@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo 'Creating backup of single-instance...'
+sudo mysqldump --all-databases --lock-all-tables --gtid > single-instance-backup.sql || exit $?
+echo 'Backup creation done'
+
+echo 'Importing backup into db1...'
+sudo mariadb --defaults-group-suffix=".db1" < single-instance-backup.sql || exit $?
+echo 'Import done'

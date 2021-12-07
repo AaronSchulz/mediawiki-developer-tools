@@ -108,6 +108,15 @@ The must be run in a folder called "extensions" that contains the extension repo
 * grep-all: searches all extension repos and groups output by repo
 * grep-wmf: searches only extensions enabled on Wikimedia productions sites and groups output by repo 
 
+## MariaDB multi-instance SystemD setup ##
+A set of scripts are included for quickly setting up replication on a single machine using mariadb.
+
+* setup_multi_mariadb: setup db1, db2, db3, db4 instances using the mariadb@ SystemD template
+* setup_mariadb_replication: make the db2,db3, db4 instances replicate from db1
+* import_stock_mariadb: import stock mariadb instance data into the db1 instance
+
+These scripts can be found in the /maria subdirectory.
+
 ## Other utilities ##
 A set of programs that can be run from anywhere.
 
@@ -115,6 +124,7 @@ A set of programs that can be run from anywhere.
 with the one used by your IDE(s) for development. This is mostly useful when the server runs inside
 WSL (with native file system access) but the IDE runs as a Win32 app that needs to heavily watch, stat,
 and read thousands of files (requiring native file system access).
+* mmariadb: Run mariadb, with the first argument passed as the --defaults-group-suffix option
 
 These programs can be enabled by creating symlinks within the "~/bin" folder, e.g.:
 

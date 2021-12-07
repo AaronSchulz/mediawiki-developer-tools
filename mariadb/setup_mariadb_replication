@@ -1,0 +1,35 @@
+#!/bin/bash
+
+REAL_PATH=$(realpath "$0")
+BASE_DIR=$(dirname "$REAL_PATH")
+NODES=("db1 db2 db3 db4")
+REPLICA_NODES=("db2 db3 db4")
+
+cd ~
+
+echo 'Configuring grants...'
+for NODE in $NODES; do
+  sudo systemctl start "mariadb@${NODE}.service"
+  echo "CREATE USER IF NOT EXISTS 'repl'@'127.0.0.1' IDENTIFIED BY 'generic_password'; GRANT REPLICATION SLAVE ON *.* TO 'repl'@'127.0.0.1';" |
+    sudo mariadb --defaults-group-suffix=".${NODE}" || exit $?
+done
+echo 'Configuration done'
+
+for NODE in $REPLICA_NODES; do
+  NODE_ID=$(echo "${NODE}" | grep -Po '\d+$')
+  echo "Setting up replication on ${NODE}..."
+  echo "STOP SLAVE;
+  CHANGE MASTER TO
+     MASTER_HOST='127.0.0.1',
+     MASTER_PORT=3316,
+     MASTER_USER='repl',
+     MASTER_PASSWORD='generic_password',
+     MASTER_USE_GTID=slave_pos,
+     MASTER_DELAY=0;
+  START SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}"
+  echo "Replication setup done"
+done
+
+for NODE in $REPLICA_NODES; do
+   echo "GRANT SLAVE MONITOR ON *.* TO 'wikiuser'@'localhost';" | sudo mariadb --defaults-group-suffix=".${NODE}"
+done

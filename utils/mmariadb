@@ -1,0 +1,11 @@
+#!/bin/bash
+
+NODE=$1
+shift
+
+if [ -z "${NODE}" ]; then
+	echo "Usage: mmariadb <group suffix> <mariadb arguments>"
+	exit 1;
+fi
+
+sudo mariadb --defaults-group-suffix=".${NODE}" "$@"
