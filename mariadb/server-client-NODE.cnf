@@ -8,3 +8,4 @@ datadir                 = /var/lib/mysql-multi/#NODE#
 log_bin                 = /var/log/mysql-multi/#NODE#/mysql-bin.log
 log_error               = /var/log/mysql-multi/#NODE#/error.log
 server-id               = 1#NODE_ID#
+tmpdir                  = /tmp-mariadb:/tmp

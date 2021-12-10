@@ -8,4 +8,9 @@ if [ -z "${NODE}" ]; then
 	exit 1;
 fi
 
+if [ ! -f "/etc/mysql/${NODE}.cnf" ]; then
+	echo "Could not find /etc/mysql/${NODE}.cnf"
+	exit 1;
+fi
+
 sudo mariadb --defaults-group-suffix=".${NODE}" "$@"
