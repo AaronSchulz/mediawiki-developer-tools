@@ -12,7 +12,7 @@ function yubireset() {
 }
 
 # git
-alias glog='~/bin/git log --dirstat --decorate --color=always'
+alias glog='~/bin/git log --dirstat --decorate --topo-order --no-merges --color=always'
 alias gstatus='~/bin/git status'
 alias gdiff,iw='~/bin/git diff -U20 --color=always --stat'
 alias gvdiff,iw='~/bin/git difftool --color=always -yd'
