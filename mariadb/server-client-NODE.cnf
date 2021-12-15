@@ -3,9 +3,10 @@
 port                    = 33#NODE_ID#6
 socket                  = /run/mysqld/#NODE#.sock
 [mariadb.#NODE_SECTION#]
+user                    = mysql
 pid-file                = /run/mysqld/#NODE#.pid
 datadir                 = /var/lib/mysql-multi/#NODE#
 log_bin                 = /var/log/mysql-multi/#NODE#/mysql-bin.log
 log_error               = /var/log/mysql-multi/#NODE#/error.log
 server-id               = 1#NODE_ID#
-tmpdir                  = /tmp-mariadb:/tmp
+tmpdir                  = /tmp-mysql:/tmp
