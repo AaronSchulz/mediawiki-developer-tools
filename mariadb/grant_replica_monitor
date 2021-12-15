@@ -1,0 +1,20 @@
+#!/bin/bash
+
+REAL_PATH=$(realpath "$0")
+BASE_DIR=$(dirname "$REAL_PATH")
+NODES=("db1 db2 db3 db4")
+REPLICA_NODES=("db2 db3 db4")
+
+USER=$1
+if [ -z "${USER}" ]; then
+  echo "Usage: grant_replicat_monitor <USERNAME>"
+  exit 1
+fi
+
+cd ~
+
+echo 'Configuring grants for wikiuser...'
+for NODE in $REPLICA_NODES; do
+   echo "GRANT SLAVE MONITOR ON *.* TO '${USER}'@'localhost';" | sudo mariadb --defaults-group-suffix=".${NODE}"
+done
+echo 'Configuration done';

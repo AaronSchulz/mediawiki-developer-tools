@@ -11,7 +11,7 @@ fi
 
 cd ~
 
-if [ grep "\[mysqld\]" "/etc/mysql/mariadb.conf.d/50-server.cnf" ]; then
+if grep "\[mysqld\]" "/etc/mysql/mariadb.conf.d/50-server.cnf"; then
   echo "The stock server must be moved to a group (e.g. [mysqld.main])"
   exit 1
 fi
@@ -79,7 +79,7 @@ for NODE in $NODES; do
 
   echo "Registering ${NODE} service..."
   sudo systemctl enable "mariadb@${NODE}.service"|| exit $?
-  sudo systemctl start "mariadb@${NODE}.service" && wait
+  sudo systemctl start "mariadb@${NODE}.service" || exit $?
   echo "Service register/start done"
 done
 

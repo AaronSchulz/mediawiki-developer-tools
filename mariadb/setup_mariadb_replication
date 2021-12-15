@@ -3,33 +3,50 @@
 REAL_PATH=$(realpath "$0")
 BASE_DIR=$(dirname "$REAL_PATH")
 NODES=("db1 db2 db3 db4")
+PRIMARY_NODE="db1"
 REPLICA_NODES=("db2 db3 db4")
+
+PASS="generic_password"
 
 cd ~
 
-echo 'Configuring grants...'
-for NODE in $NODES; do
-  sudo systemctl start "mariadb@${NODE}.service"
-  echo "CREATE USER IF NOT EXISTS 'repl'@'127.0.0.1' IDENTIFIED BY 'generic_password'; GRANT REPLICATION SLAVE ON *.* TO 'repl'@'127.0.0.1';" |
-    sudo mariadb --defaults-group-suffix=".${NODE}" || exit $?
-done
-echo 'Configuration done'
+sudo systemctl start "mariadb@${PRIMARY_NODE}.service" || exit $?
+echo "Configuring grants for repl on ${PRIMARY_NODE}..."
+echo "CREATE USER IF NOT EXISTS 'repl'@'127.0.0.1' IDENTIFIED BY '${PASS}'; GRANT REPLICATION SLAVE ON *.* TO 'repl'@'127.0.0.1';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
+wait
+
+GTID_MASTER_POS=$(echo "select @@gtid_current_pos" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B | tail -n 1)
+if [ -z "${GTID_MASTER_POS}" ]; then
+  echo "Could not get gtid_current_pos"
+  exit 1
+fi
+echo "Using master GTID pos '${GTID_MASTER_POS}'"
+
+echo "========== ${PRIMARY_NODE} ========== "
+echo "show variables like '%gtid%';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
+echo "=========="
+echo "Configuration done"
 
 for NODE in $REPLICA_NODES; do
-  NODE_ID=$(echo "${NODE}" | grep -Po '\d+$')
-  echo "Setting up replication on ${NODE}..."
-  echo "STOP SLAVE;
-  CHANGE MASTER TO
-     MASTER_HOST='127.0.0.1',
-     MASTER_PORT=3316,
-     MASTER_USER='repl',
-     MASTER_PASSWORD='generic_password',
-     MASTER_USE_GTID=slave_pos,
-     MASTER_DELAY=0;
-  START SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}"
-  echo "Replication setup done"
-done
+  sudo systemctl start "mariadb@${NODE}.service" || exit $?
 
-for NODE in $REPLICA_NODES; do
-   echo "GRANT SLAVE MONITOR ON *.* TO 'wikiuser'@'localhost';" | sudo mariadb --defaults-group-suffix=".${NODE}"
+  echo "Resetting/stopping any replication on ${NODE}..."
+  echo "STOP SLAVE; RESET SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+  wait
+  echo "Replication stopped"
+
+  echo "Configuring replication on ${NODE}..."
+  echo "SET GLOBAL gtid_slave_pos = '${GTID_MASTER_POS}';" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+  wait
+  echo "========== ${NODE} ========== "
+  echo "show variables like '%gtid%';" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+  echo "=========="
+  echo "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=3316, MASTER_USER='repl', MASTER_PASSWORD='generic_password', MASTER_USE_GTID=slave_pos;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B
+  wait
+  echo "Configuring done"
+
+  echo "Starting replication on ${NODE}..."
+  echo "START SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+  wait
+  echo "Replication started"
 done
