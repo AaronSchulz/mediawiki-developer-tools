@@ -6,47 +6,50 @@ NODES=("db1 db2 db3 db4")
 PRIMARY_NODE="db1"
 REPLICA_NODES=("db2 db3 db4")
 
-PASS="generic_password"
+PASS=$1
+if [ -z "${PASS}" ]; then
+  echo "Usage: enable_replicated_multi_mariadb <repl user PASSWORD>"
+  exit 1
+fi
 
 cd ~
 
-sudo systemctl start "mariadb@${PRIMARY_NODE}.service" || exit $?
+for NODE in $NODES; do
+  sudo systemctl start "mariadb@${NODE}.service" || exit $?
+done
+
 echo "Configuring grants for repl on ${PRIMARY_NODE}..."
 echo "CREATE USER IF NOT EXISTS 'repl'@'127.0.0.1' IDENTIFIED BY '${PASS}'; GRANT REPLICATION SLAVE ON *.* TO 'repl'@'127.0.0.1';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
-wait
 
+echo "Getting GTID info for ${PRIMARY_NODE}..."
 GTID_MASTER_POS=$(echo "select @@gtid_current_pos" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B | tail -n 1)
 if [ -z "${GTID_MASTER_POS}" ]; then
   echo "Could not get gtid_current_pos"
   exit 1
 fi
-echo "Using master GTID pos '${GTID_MASTER_POS}'"
-
 echo "========== ${PRIMARY_NODE} ========== "
 echo "show variables like '%gtid%';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
 echo "=========="
-echo "Configuration done"
+echo "Using master GTID pos '${GTID_MASTER_POS}'"
 
 for NODE in $REPLICA_NODES; do
-  sudo systemctl start "mariadb@${NODE}.service" || exit $?
+  READ_ONLY=$(echo "select @@read_only" | sudo mariadb --defaults-group-suffix=".${NODE}" -B | tail -n 1)
+  if [ "${READ_ONLY}" -eq 1 ]; then
+    echo "${NODE} is read-only; skipping";
+    continue;
+  fi
 
   echo "Resetting/stopping any replication on ${NODE}..."
   echo "STOP SLAVE; RESET SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
-  wait
-  echo "Replication stopped"
 
   echo "Configuring replication on ${NODE}..."
   echo "SET GLOBAL gtid_slave_pos = '${GTID_MASTER_POS}';" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
-  wait
   echo "========== ${NODE} ========== "
   echo "show variables like '%gtid%';" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
   echo "=========="
   echo "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=3316, MASTER_USER='repl', MASTER_PASSWORD='generic_password', MASTER_USE_GTID=slave_pos;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B
-  wait
-  echo "Configuring done"
 
   echo "Starting replication on ${NODE}..."
   echo "START SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
-  wait
-  echo "Replication started"
+  echo "SET GLOBAL READ_ONLY = ON;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
 done

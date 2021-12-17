@@ -108,11 +108,11 @@ The must be run in a folder called "extensions" that contains the extension repo
 * grep-all: searches all extension repos and groups output by repo
 * grep-wmf: searches only extensions enabled on Wikimedia productions sites and groups output by repo 
 
-## MariaDB multi-instance SystemD setup ##
+## SystemD multi-instance MariaDB helpers ##
 A set of scripts are included for quickly setting up replication on a single machine using mariadb.
 
 * setup_multi_mariadb: setup db1, db2, db3, db4 instances using the mariadb@ SystemD template
-* setup_mariadb_replication: make the db2,db3, db4 instances replicate from db1
+* enable_replicated_multi_mariadb: make the db2,db3,db4 instances replicate from db1
 * import_stock_mariadb: import stock mariadb instance data into the db1 instance
 
 These scripts can be found in the /maria subdirectory.
