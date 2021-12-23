@@ -37,6 +37,10 @@ if [ ! -d "/var/log/mysql-multi" ]; then
   sudo mkdir "/var/log/mysql-multi" || exit $?
   sudo chown -R mysql:adm "/var/log/mysql-multi" || exit $?
 fi
+if [ ! -d "/run/mysql-multi" ]; then
+  sudo mkdir "/run/mysql-multi" || exit $?
+  sudo chown -R mysql:mysql "/run/mysql-multi" || exit $?
+fi
 for NODE in $NODES; do
   if [ ! -d "/var/lib/mysql-multi/${NODE}" ]; then
     sudo mkdir "/var/lib/mysql-multi/${NODE}" || exit $?
