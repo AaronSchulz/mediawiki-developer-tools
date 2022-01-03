@@ -380,13 +380,13 @@ function repo_bypass_creation_if_archived() {
 	exit 0
 }
 
-function get_upstream_extensions_wmf() {
+function get_upstream_plugins_wmf() {
 	# Exclude nested repositories for directory layout sanity
 	# shellcheck disable=SC2016
 	curl -sL "${EXTLIST_WMF_URL}" | grep -P "${EXTLIST_WMF_REGEX}" | awk -F/ '{print $3}' | sort -u
 }
 
-function get_upstream_extensions_all() {
+function get_upstream_plugins_all() {
 	# Exclude nested repositories for directory layout sanity
 	curl -sL "${EXTLIST_ALL_URL}" | grep -P "${EXTLIST_ALL_REGEX}" | awk -F'[/ ]' '{print $1 "|" $4}'
 }
@@ -402,7 +402,7 @@ function git_command_all() {
 	fi
 
 	declare -A REMOTE_SHA1_BY_REPO
-	echo -n "Retrieving known MediaWiki extension list..."
+	echo -n "Enumerating plugin repos under '${GERRIT_EXT_DIR}'..."
 	# shellcheck disable=SC2162
 	while IFS='|' read -r sha1 name; do
 		#echo "Found upstream repo '$name'"
@@ -411,15 +411,15 @@ function git_command_all() {
 			exit 1
 		fi
 		REMOTE_SHA1_BY_REPO[$name]="$sha1"
-	done <<<"$(get_upstream_extensions_all)"
+	done <<<"$(get_upstream_plugins_all)"
 	echo "done"
 
 	# Figure out which repos this command will actually affect
 	declare -A REMOTE_SHA1_BY_TARGET_REPO
 	if [ -n "${GIT_ALL_WMF_ONLY}" ]; then
 		declare -a WMF_DEPLOYED_REPOS
-		echo -n "Retrieving WMF-deployed MediaWiki extension list..."
-		mapfile -t WMF_DEPLOYED_REPOS < <(get_upstream_extensions_wmf)
+		echo -n "Enumerating WMF-deployed plugin repos under '${GERRIT_EXT_DIR}'..."
+		mapfile -t WMF_DEPLOYED_REPOS < <(get_upstream_plugins_wmf)
 		for name in "${WMF_DEPLOYED_REPOS[@]}"; do
 			if [[ ! -v REMOTE_SHA1_BY_REPO[$name] ]]; then
 				echo "Missing REMOTE_SHA1_BY_REPO entry for '$name'!" >>/dev/stderr
