@@ -35,7 +35,10 @@ echo "Using master GTID pos '${GTID_MASTER_POS}'"
 for NODE in $REPLICA_NODES; do
   READ_ONLY=$(echo "select @@read_only" | sudo mariadb --defaults-group-suffix=".${NODE}" -B | tail -n 1)
   if [ "${READ_ONLY}" -eq 1 ]; then
-    echo "${NODE} is read-only; skipping";
+    echo ""
+    echo "Server ${NODE} is read only, checking replication status...";
+    echo "SHOW REPLICA STATUS\G" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+    echo "...skipped server ${NODE}"
     continue;
   fi
 
@@ -47,9 +50,10 @@ for NODE in $REPLICA_NODES; do
   echo "========== ${NODE} ========== "
   echo "show variables like '%gtid%';" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
   echo "=========="
-  echo "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=3316, MASTER_USER='repl', MASTER_PASSWORD='generic_password', MASTER_USE_GTID=slave_pos;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B
+  echo "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=3316, MASTER_USER='repl', MASTER_PASSWORD='${PASS}', MASTER_USE_GTID=slave_pos;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B
 
   echo "Starting replication on ${NODE}..."
   echo "START SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
   echo "SET GLOBAL READ_ONLY = ON;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+  echo "SHOW REPLICA STATUS\G" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
 done
