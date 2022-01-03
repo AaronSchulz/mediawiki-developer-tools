@@ -16,3 +16,4 @@ fi
 cd ~
 
 echo "GRANT SLAVE MONITOR ON *.* TO '${USER}'@'${HOSTNAME}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}"
+echo "GRANT BINLOG MONITOR ON *.* TO '${USER}'@'${HOSTNAME}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}"
