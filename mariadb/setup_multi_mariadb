@@ -34,7 +34,7 @@ if [ ! -d "/var/lib/mysql-multi" ]; then
   sudo chown -R mysql:mysql "/var/lib/mysql-multi" || exit $?
 fi
 if [ ! -d "/var/log/mysql-multi" ]; then
-  sudo mkdir "/var/log/mysql-multi" || exit $?
+  sudo mkdir -m 0774 "/var/log/mysql-multi" || exit $?
   sudo chown -R mysql:adm "/var/log/mysql-multi" || exit $?
 fi
 if [ ! -d "/run/mysql-multi" ]; then
@@ -44,13 +44,17 @@ fi
 for NODE in $NODES; do
   if [ ! -d "/var/lib/mysql-multi/${NODE}" ]; then
     sudo mkdir "/var/lib/mysql-multi/${NODE}" || exit $?
-    sudo chown -R mysql:adm "/var/lib/mysql-multi/${NODE}" || exit $?
+    sudo chown -R mysql "/var/lib/mysql-multi/${NODE}" || exit $?
   fi
   if [ ! -d "/var/log/mysql-multi/${NODE}" ]; then
-    sudo mkdir "/var/log/mysql-multi/${NODE}" || exit $?
+    sudo mkdir -m 0774 "/var/log/mysql-multi/${NODE}" || exit $?
     sudo chown -R mysql:adm "/var/log/mysql-multi/${NODE}" || exit $?
   fi
 done
+# Create temporary /var/run directory on boot
+if [ ! -f "/usr/lib/tmpfiles.d/mysql-multi.conf" ]; then
+  echo "d /run/mysqld-multi 0755 mysql mysql  -" | sudo tee "/usr/lib/tmpfiles.d/mysql-multi.conf"
+fi
 
 # See /lib/systemd/system/mariadb@.service
 echo 'Setting multi-instance config...'
