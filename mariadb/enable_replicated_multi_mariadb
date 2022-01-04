@@ -8,7 +8,7 @@ REPLICA_NODES=("db2 db3 db4")
 
 PASS=$1
 if [ -z "${PASS}" ]; then
-  echo "Usage: enable_replicated_multi_mariadb <repl user PASSWORD>"
+  echo "Usage: enable_replicated_multi_mariadb <REPLICATION USER PASSWORD>"
   exit 1
 fi
 
