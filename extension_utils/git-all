@@ -28,7 +28,7 @@ else
 fi
 
 function print_usage() {
-	echo "Usage: ${SCRIPT_BASENAME} <sync|commit|push|reset|review|gc> [message]"
+	echo "Usage: ${SCRIPT_BASENAME} <sync|commit|push|reset|review|update|gc> [message]"
 }
 
 function cmd_update_remote() {
