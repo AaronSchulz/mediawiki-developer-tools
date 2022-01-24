@@ -49,7 +49,7 @@ alias gphpcs='PHP_CS_BIN="vendor/bin/phpcs"; if [ ! -x "${PHP_CS_BIN}" ]; then P
 alias winwhere="/mnt/c/Windows/System32/where.exe"
 
 # Fast OPCache-based PHP scripts
-alias wphp='sudo -u www-data php -d opcache.file_cache=/opcache/php7 -d opcache.file_cache_only=1'
+alias wphp='sudo -u www-data php'
 
 # Convenience wrapper to synchronize /srv/mediawiki with PhpStormProjects/mediawiki
 alias syncsrvmediawiki="sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR ${HOME}/bin/sync-srv-mediawiki"

@@ -131,6 +131,7 @@ if [ -d /opcache/php ]; then
 	PHP_ARGS+=("-d opcache.enable_cli=1")
 	PHP_ARGS+=("-d opcache.file_cache=/opcache/php")
 	PHP_ARGS+=("-d opcache.file_cache_only=1")
+	PHP_ARGS+=("-d opcache.lockfile_path=/opcache/php")
 fi
 
 # Note that the "development path" just means $PWD in this context.
