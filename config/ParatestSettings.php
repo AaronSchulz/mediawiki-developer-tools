@@ -9,7 +9,7 @@
 function wfCloneSqliteSchemaForParatest( string $liveDbPath, string $cloneDbPath ) {
     $proc = popen(
         "echo '.schema main.*' | " .
-        "sqlite3 --readonly " . escapeshellarg( $liveDbPath ) . " | " .
+        "sqlite3 --readonly --batch " . escapeshellarg( $liveDbPath ) . " | " .
         "grep -v 'CREATE TABLE sqlite_sequence' | " .
         "sqlite3 " . escapeshellarg( $cloneDbPath ),
         'r'
