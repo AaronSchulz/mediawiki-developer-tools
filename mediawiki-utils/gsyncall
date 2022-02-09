@@ -1,0 +1,7 @@
+#!/bin/bash
+
+(cd core && git diff --exit-code --stat && git remote update && git reset --hard origin/master && composer.phar update)
+
+(cd skins && ./git-all sync)
+
+(cd extensions && ./git-all sync)
