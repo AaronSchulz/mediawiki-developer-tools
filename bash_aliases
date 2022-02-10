@@ -30,7 +30,7 @@ alias grebaseabort='~/bin/git rebase --abort'
 alias gsyncmaster='~/bin/git diff --exit-code --stat && ~/bin/git remote update && [[ "$(~/bin/git branch --show-current)" == 'master' ]] && ~/bin/git reset --hard origin/master'
 alias gsyncprod='~/bin/git remote update&& [[ "$(~/bin/git branch --show-current)" == 'production' ]] && ~/bin/git reset --hard origin/production'
 alias gadd='~/bin/git add --interactive'
-alias gcommit='~/bin/git commit'
+alias gcommit='~/bin/git add --interactive && git commit'
 alias gamend='~/bin/git commit -a --amend'
 
 # git-review
