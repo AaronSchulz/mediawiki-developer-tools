@@ -4,9 +4,15 @@ REAL_PATH=$(realpath "$0")
 CORE_UTILS_DIR=$(dirname "$REAL_PATH")
 BASE_DIR=$(dirname "$CORE_UTILS_DIR")
 SCRIPT_BASENAME=$(basename "$REAL_PATH")
-TMP_SUBDIR_NAME="mediawiki-phpunit"
 
 COMMAND=$1
+
+PHPUNIT_CACHE_FILE="/tmp/mw-phpunit-cache.${COMMAND}"
+
+declare -i NUM_RAND=$(od -A n -t u -N 4 /dev/urandom)
+TMP_SUBDIR_PREFIX="mw-phpunit"
+TMP_SUBDIR_NAME="${TMP_SUBDIR_PREFIX}.${NUM_RAND}"
+
 shift 1
 declare -a ARGS=("$@")
 
@@ -14,7 +20,7 @@ function print_usage() {
 	echo "Usage: ${SCRIPT_BASENAME} <dev_phpunit|dev_paratest|srv_phpunit|srv_paratest>"
 }
 
-function prepare_tmpfs_temp_dir() {
+function prepare_mw_temp_dir() {
 	local TMPDIR_MOUNT=$1
 	local TMPDIR_MEDIAWIKI="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
 
@@ -23,24 +29,58 @@ function prepare_tmpfs_temp_dir() {
 		exit 127
 	fi
 
-	echo -n "Clearing '${TMPDIR_MEDIAWIKI}'..."
-	sudo -u www-data mkdir -p "${TMPDIR_MEDIAWIKI}"
-	sudo -u www-data rm -rf "${TMPDIR_MEDIAWIKI}/*" || exit $?
+	echo -n "Preparing '${TMPDIR_MEDIAWIKI}'..."
+	if [ ! -d "${TMPDIR_MEDIAWIKI}" ]; then
+	  sudo -u www-data mkdir -p "${TMPDIR_MEDIAWIKI}" || exit $?
+  fi
 	echo "done"
 }
 
+function clean_mw_temp_dir() {
+	local TMPDIR_MOUNT=$1
+	local TMPDIR_MEDIAWIKI="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
+
+	echo -n "Clearing '${TMPDIR_MEDIAWIKI}'..."
+	if [ -d "${TMPDIR_MEDIAWIKI}" ]; then
+		sudo -u www-data rm -rf "${TMPDIR_MEDIAWIKI}" || exit $?
+	fi
+	echo "done"
+
+	echo -n "Clearing orphaned files in '${TMPDIR_MOUNT}'..."
+	find "${TMPDIR_MOUNT}" -name "${TMP_SUBDIR_PREFIX}.*" -type f -mmin +60 -delete
+	echo "done"
+}
+
+function prepare_mw_paratest_phpunit_config() {
+	local MW_CORE_DIR=$1
+	# XXX: ugly work-around poorly divided suites
+	echo -n "Creating '${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml'..."
+	if [ "${BASE_DIR}/config/mwp_suite.xml" -nt "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml" ]; then
+	  sudo -u www-data cp "${BASE_DIR}/config/mwp_suite.xml" "${MW_CORE_DIR}/tests/phpunit/" || exit $?
+  fi
+	echo "done"
+}
+
+function clean_mw_paratest_phpunit_config() {
+	local MW_CORE_DIR=$1
+	# XXX: ugly work-around poorly divided suites
+	echo -n "Removing '${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml'..."
+  sudo -u www-data rm "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
+	echo "done"
+}
 function sync_srv_mediawiki() {
 	# Make sure ~/bin/git is used for Linux/WIN32 executable selection
-	sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR "${BASE_DIR}/utils/sync-srv-mediawiki"
+	sudo -u www-data -H --preserve-env=DEV_MW_DIR,SRV_MW_DIR "${BASE_DIR}/utils/sync-srv-mediawiki"
 }
 
 function get_preserved_variables() {
   printenv | grep -Po 'PHPUNIT_[^=]+' | sed ':a;N;$!ba;s/\n/,/g'
 }
 
-function execute_mediawiki_phpunit() {
+function execute_mw_phpunit() {
 	local MW_CORE_DIR=$1
 	local TMPFS_DIR=$2
+	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 
 	(
 		set -e
@@ -53,19 +93,20 @@ function execute_mediawiki_phpunit() {
 		fi
 
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-		  TMPDIR="${TMPFS_DIR}" php "${PHP_ARGS[@]}" \
+		  TMPDIR="${TMPDIR_MEDIAWIKI}" php "${PHP_ARGS[@]}" \
 			"./tests/phpunit/phpunit.php" \
 			--colors=always \
-			"${ARGS[@]}" 2>&1
+			"${PHPUNIT_ARGS[@]}" 2>&1
 	)
 }
 
-function execute_mediawiki_paratest() {
+function execute_mw_paratest() {
 	local MW_CORE_DIR=$1
 	local TMPFS_DIR=$2
 	local PARATEST_BIN="",
 	local PRESERVE_ENV=""
 	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
+	local PROCESSES=$(($(nproc --all)))
 
 	PARATEST_BIN="${HOME}/.config/composer/vendor/bin/paratest"
 	if [ ! -x "${PARATEST_BIN}" ]; then
@@ -76,12 +117,6 @@ function execute_mediawiki_paratest() {
 	(
 		set -e
 		cd "$MW_CORE_DIR"
-
-		# XXX: ugly work-around poorly divided suites
-		if [ "${BASE_DIR}/config/mw_core_suite.xml" -nt "./tests/phpunit/mw_core_suite.xml" ]; then
-			sudo -u www-data -H cp "${BASE_DIR}/config/mw_core_suite.xml" "./tests/phpunit/" || exit $?
-
-		fi
 
 		# XXX: work around sqlite DB concurrency limitations
 		if ! tail -1 './LocalSettings.php' | grep 'ParatestSettings.php' -q; then
@@ -101,12 +136,15 @@ function execute_mediawiki_paratest() {
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
 		  TMPDIR="${TMPDIR_MEDIAWIKI}" "${PARATEST_BIN}" \
 			--phpunit="tests/phpunit/phpunit.php" \
-			--configuration="tests/phpunit/mw_core_suite.xml" \
+			--configuration="tests/phpunit/mwp_suite.xml" \
 			--bootstrap="${BASE_DIR}/config/dummy.php" \
-			--colors \
+			--tmp-dir="${TMPDIR_MEDIAWIKI}" \
+			--processes="${PROCESSES}" \
 			--parallel-suite \
+			--colors \
 			--passthru-php="${PHP_ARGS[*]}" \
-			--passthru="${ARGS[*]}"
+			--passthru="${PHPUNIT_ARGS[*]}" \
+			--verbose="$(($VERBOSE))"
 	)
 }
 
@@ -134,36 +172,49 @@ if [ -d /opcache/php ]; then
 	PHP_ARGS+=("-d opcache.lockfile_path=/opcache/php")
 fi
 
+declare -a PHPUNIT_ARGS
+# Set the phpunit cache file to a reasonably permanent location
+PHPUNIT_ARGS+=("--cache-result-file=${PHPUNIT_CACHE_FILE}")
+# Run tests in order of (dependency-free,largest) first, breaking ties with the "default" sort.
+# Size is based on @small, @medium, @large annotations
+PHPUNIT_ARGS+=("--order-by=no-depends,size,reverse,default")
+#PHPUNIT_ARGS+=("--order-by=no-depends,duration")
+if [ ${#ARGS[@]} -gt 0 ]; then
+  PHPUNIT_ARGS=(${PHPUNIT_ARGS[@]} ${ARGS[@]})
+fi
+
 # Note that the "development path" just means $PWD in this context.
 # This allows for easy testing of multiple checkouts of MediaWiki.
 case $COMMAND in
 "dev_phpunit")
-	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_phpunit . "${TMPDIR_MOUNT}" 2>&1 | less -R
+  DEV_MW_CORE=$(realpath $PWD)
+	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	execute_mw_phpunit "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "dev_paratest")
-	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_paratest . "${TMPDIR_MOUNT}" 2>&1 | less -R
+  DEV_MW_CORE=$(realpath $PWD)
+	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	prepare_mw_paratest_phpunit_config "${DEV_MW_CORE}" || exit $?
+	execute_mw_paratest "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	clean_mw_paratest_phpunit_config "${DEV_MW_CORE}"
+	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "srv_phpunit")
-	if [ -z "${SRV_MW_DIR}" ]; then
-		echo "SRV_MW_DIR (webserver mediawiki directory) is not set"
-		exit 1
-	fi
-	SRV_MW_CORE="${SRV_MW_DIR}/core"
 	sync_srv_mediawiki || exit $?
-	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	SRV_MW_CORE="${SRV_MW_DIR}/core"
+	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	execute_mw_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "srv_paratest")
-	if [ -z "${SRV_MW_DIR}" ]; then
-		echo "SRV_MW_DIR (webserver mediawiki directory) is not set"
-		exit 1
-	fi
-	SRV_MW_CORE="${SRV_MW_DIR}/core"
 	sync_srv_mediawiki || exit $?
-	prepare_tmpfs_temp_dir "${TMPDIR_MOUNT}" || exit $?
-	execute_mediawiki_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	SRV_MW_CORE="${SRV_MW_DIR}/core"
+	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	prepare_mw_paratest_phpunit_config "${SRV_MW_CORE}" || exit $?
+	execute_mw_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	clean_mw_paratest_phpunit_config "${SRV_MW_CORE}"
+	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 *)
 	echo "Invalid command: ${COMMAND}" >&2

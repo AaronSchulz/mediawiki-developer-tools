@@ -1,28 +1,44 @@
 <?php
 
+use Wikimedia\Rdbms\DatabaseSqlite;
+
 /**
  * Make an empty DB with the same schema as the reference DB
  *
  * @param string $liveDbPath
  * @param string $cloneDbPath
  */
-function wfCloneSqliteSchemaForParatest( string $liveDbPath, string $cloneDbPath ) {
-    $proc = popen(
-        "echo '.schema main.*' | " .
-        "sqlite3 --readonly --batch " . escapeshellarg( $liveDbPath ) . " | " .
-        "grep -v 'CREATE TABLE sqlite_sequence' | " .
-        "sqlite3 " . escapeshellarg( $cloneDbPath ),
-        'r'
-    );
-    stream_get_contents( $proc );
-    if ( pclose( $proc ) !== 0 ) {
-		throw new RuntimeException( "Failed to clone '$liveDbPath' schema to '$cloneDbPath'" );
+function mwptInitSchemaClone( string $liveDbPath, string $cloneDbPath ) {
+	if ( is_file( $cloneDbPath ) ) {
+		if ( filesize( $cloneDbPath ) ) {
+			#return;
+		}
+		unlink( $cloneDbPath );
+	}
+
+	$dbl = DatabaseSqlite::newStandaloneInstance( $liveDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
+	$dbc = DatabaseSqlite::newStandaloneInstance( $cloneDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
+
+	$sqls = $dbl->selectFieldValues(
+		$dbl->addIdentifierQuotes( 'sqlite_master' ),
+		'sql',
+		[
+			'type' => [ 'index', 'table' ],
+			"name NOT " . $dbl->buildLike( 'sqlite_', $dbl->anyString() ),
+			"name NOT " . $dbl->buildLike( 'searchindex_', $dbl->anyString() ),
+			// @see MediaWikiIntegrationTestCase::DB_PREFIX
+			"name NOT " . $dbl->buildLike( 'unittest_', $dbl->anyString() )
+		]
+	);
+	foreach ( $sqls as $sql ) {
+		$dbc->query( $sql, __METHOD__, $dbc::QUERY_CHANGE_SCHEMA );
 	}
 }
 
-function wfModifyConfigForParatest() {
+function mwptModifyDirectories() {
     global $wgTmpDirectory, $wgSQLiteDataDir, $wgUploadDirectory, $wgCacheDirectory;
     global $wgDBservers, $wgDBtype, $wgDBserver, $wgDBname, $wgDBuser, $wgDBpassword;
+    global $wgLocalisationCacheConf;
     global $wgDirectoryMode;
 
     if ( getenv( 'TMPDIR' ) === false || getenv( 'TEST_TOKEN' ) === false ) {
@@ -55,9 +71,7 @@ function wfModifyConfigForParatest() {
             // Create or reuse the empty test DB for the assigned slot
             $liveDbPath = ( $server['dbDirectory'] ?? $wgSQLiteDataDir ) . "/$wgDBname.sqlite";
             $cloneDbPath = "$wgTmpDirectory/$wgDBname.sqlite";
-            if ( !is_file( $cloneDbPath ) || !filesize( $cloneDbPath ) ) {
-                wfCloneSqliteSchemaForParatest( $liveDbPath, $cloneDbPath );
-            }
+            mwptInitSchemaClone( $liveDbPath, $cloneDbPath );
             // Avoid sharing certain resources among concurrent threads
             $wgDBservers[$i]['dbDirectory'] = $wgTmpDirectory;
             // Use the test DB with relaxed settings
@@ -67,10 +81,20 @@ function wfModifyConfigForParatest() {
         }
     }
 
+	// Make $wgLocalisationCacheConf use the assigned temp dir where applicable
+	$wgLocalisationCacheConf['storeDirectory'] = $wgTmpDirectory;
+	if ( isset( $wgLocalisationCacheConf['dbDirectory'], $wgLocalisationCacheConf['dbname'] ) ) {
+		$dbName = $wgLocalisationCacheConf['dbname'];
+		$liveDbPath = "{$wgLocalisationCacheConf['dbDirectory']}/$dbName";
+		$cloneDbPath = "$wgTmpDirectory/$dbName.sqlite";
+		mwptInitSchemaClone( $liveDbPath, $cloneDbPath );
+		$wgLocalisationCacheConf['dbDirectory'] = $wgTmpDirectory;
+	}
+
     // Avoid sharing certain resources among concurrent threads
     $wgUploadDirectory = $wgTmpDirectory;
     $wgCacheDirectory = $wgTmpDirectory;
     $wgSQLiteDataDir = $wgTmpDirectory;
 }
 
-wfModifyConfigForParatest();
+mwptModifyDirectories();
