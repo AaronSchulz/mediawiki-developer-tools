@@ -7,8 +7,6 @@ SCRIPT_BASENAME=$(basename "$REAL_PATH")
 
 COMMAND=$1
 
-PHPUNIT_CACHE_FILE="/tmp/mw-phpunit-cache.${COMMAND}"
-
 declare -i NUM_RAND=$(od -A n -t u -N 4 /dev/urandom)
 TMP_SUBDIR_PREFIX="mw-phpunit"
 TMP_SUBDIR_NAME="${TMP_SUBDIR_PREFIX}.${NUM_RAND}"
@@ -55,19 +53,68 @@ function prepare_mw_paratest_phpunit_config() {
 	local MW_CORE_DIR=$1
 	# XXX: ugly work-around poorly divided suites
 	echo -n "Creating '${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml'..."
-	if [ "${BASE_DIR}/config/mwp_suite.xml" -nt "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml" ]; then
-	  sudo -u www-data cp "${BASE_DIR}/config/mwp_suite.xml" "${MW_CORE_DIR}/tests/phpunit/" || exit $?
-  fi
+	(
+		set -e
+    declare -a PATHS
+		declare -i CLASSES_PER_SUITE;
+    declare -i SUBSUITE_INDEX
+    declare -a SUBSUITE_TAGS
+    declare -a SUBSUITES
+    local XML=""
+    local WHAT=""
+    local WITH=""
+    local SUITE_FILE_XML=""
+    cd "${MW_CORE_DIR}/tests/phpunit"
+
+    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/tests/phpunit/suite.xml")"
+
+    for suite in includes integration structure languages; do
+      INDEX=0
+      SUBSUITE_TAGS=()
+      mapfile -t PATHS < <(find "${suite}" -name '*Test.php' -o -name 'Test*.php' | sort)
+      CLASSES_PER_SUITE=$(logbase4 "${#PATHS[@]}")
+      CLASSES_PER_SUITE=$((CLASSES_PER_SUITE < 1 ? 1 : CLASSES_PER_SUITE))
+
+      for path in "${PATHS[@]}"; do
+        path=${path//</&lt;}
+        path=${path//>/&gt;}
+        SUBSUITE_TAGS+=("<file>${path}</file>")
+        if [ ${#SUBSUITE_TAGS[@]} -ge $CLASSES_PER_SUITE ]; then
+          printf -v XML "%s\n\t\t\t" "${SUBSUITE_TAGS[@]}"
+          XML="${XML%$'\n\t\t\t'}"
+          SUBSUITES+=("<testsuite name=\"${suite}_${INDEX}\">"$'\n\t\t\t'"${XML}"$'\n\t\t'"</testsuite>")
+          INDEX=$((INDEX+1))
+          SUBSUITE_TAGS=()
+        fi
+      done
+
+      if [ ${#SUBSUITE_TAGS[@]} -gt 0 ]; then
+        printf -v XML "%s\n\t\t\t" "${SUBSUITE_TAGS[@]}"
+        XML="${XML%$'\n\t\t\t'}"
+        SUBSUITES+=("<testsuite name=\"${suite}_${INDEX}\">"$'\n\t\t\t'"${XML}"$'\n\t\t'"</testsuite>")
+      fi
+
+      WHAT="<testsuite name=\"${suite}\">"$'\n\t\t\t'"<directory>${suite}</directory>"$'\n\t\t'"</testsuite>"
+      printf -v WITH "%s\n\t\t" "${SUBSUITES[@]}"
+      WITH="${WITH%$'\n\t\t'}"
+
+      SUITE_FILE_XML="${SUITE_FILE_XML/$WHAT/$WITH}"
+    done
+
+    echo "${SUITE_FILE_XML}" | sudo -u www-data cat > "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
+  )
 	echo "done"
 }
 
 function clean_mw_paratest_phpunit_config() {
 	local MW_CORE_DIR=$1
+
 	# XXX: ugly work-around poorly divided suites
 	echo -n "Removing '${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml'..."
-  sudo -u www-data rm "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
+  sudo -u www-data rm -f "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
 	echo "done"
 }
+
 function sync_srv_mediawiki() {
 	# Make sure ~/bin/git is used for Linux/WIN32 executable selection
 	sudo -u www-data -H --preserve-env=DEV_MW_DIR,SRV_MW_DIR "${BASE_DIR}/utils/sync-srv-mediawiki"
@@ -77,6 +124,16 @@ function get_preserved_variables() {
   printenv | grep -Po 'PHPUNIT_[^=]+' | sed ':a;N;$!ba;s/\n/,/g'
 }
 
+function logbase4() {
+  declare -i REMNANT=$1
+  declare -i LOG=-1;
+  while [ $REMNANT -gt 0 ]; do
+    LOG=$((LOG + 1 ))
+    REMNANT=$((REMNANT / 4))
+  done
+  echo "${LOG}"
+}
+
 function execute_mw_phpunit() {
 	local MW_CORE_DIR=$1
 	local TMPFS_DIR=$2
@@ -84,7 +141,7 @@ function execute_mw_phpunit() {
 
 	(
 		set -e
-		cd "$MW_CORE_DIR"
+		cd "${MW_CORE_DIR}"
 
     # Preserve environmental variables used to select test backends
 		PRESERVE_ENV=$(get_preserved_variables)
@@ -95,6 +152,7 @@ function execute_mw_phpunit() {
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
 		  TMPDIR="${TMPDIR_MEDIAWIKI}" php "${PHP_ARGS[@]}" \
 			"./tests/phpunit/phpunit.php" \
+			--cache-result-file=${PHPUNIT_CACHE_FILE} \
 			--colors=always \
 			"${PHPUNIT_ARGS[@]}" 2>&1
 	)
@@ -106,7 +164,7 @@ function execute_mw_paratest() {
 	local PARATEST_BIN="",
 	local PRESERVE_ENV=""
 	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
-	local PROCESSES=$(($(nproc --all)))
+	local PROCESSES=$((1 * $(nproc --all)))
 
 	PARATEST_BIN="${HOME}/.config/composer/vendor/bin/paratest"
 	if [ ! -x "${PARATEST_BIN}" ]; then
@@ -116,7 +174,7 @@ function execute_mw_paratest() {
 
 	(
 		set -e
-		cd "$MW_CORE_DIR"
+		cd "${MW_CORE_DIR}"
 
 		# XXX: work around sqlite DB concurrency limitations
 		if ! tail -1 './LocalSettings.php' | grep 'ParatestSettings.php' -q; then
@@ -160,6 +218,7 @@ else
 	TMPDIR_MOUNT="/tmp"
 	echo "Temporary directory is not a tmpfs; tests might be slow" >&2
 fi
+declare PHPUNIT_CACHE_FILE="${TMPDIR_MOUNT}/mw-phpunit-cache.${COMMAND}"
 
 declare -a PHP_ARGS
 # Optimize execution via OPCache
@@ -173,12 +232,7 @@ if [ -d /opcache/php ]; then
 fi
 
 declare -a PHPUNIT_ARGS
-# Set the phpunit cache file to a reasonably permanent location
 PHPUNIT_ARGS+=("--cache-result-file=${PHPUNIT_CACHE_FILE}")
-# Run tests in order of (dependency-free,largest) first, breaking ties with the "default" sort.
-# Size is based on @small, @medium, @large annotations
-PHPUNIT_ARGS+=("--order-by=no-depends,size,reverse,default")
-#PHPUNIT_ARGS+=("--order-by=no-depends,duration")
 if [ ${#ARGS[@]} -gt 0 ]; then
   PHPUNIT_ARGS=(${PHPUNIT_ARGS[@]} ${ARGS[@]})
 fi
