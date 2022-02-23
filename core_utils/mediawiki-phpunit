@@ -64,15 +64,17 @@ function prepare_mw_paratest_phpunit_config() {
     declare -i SUBSUITE_KB
     declare -a SUBSUITE_TAGS
     declare -a SUBSUITES
+    declare -a AUTO_SUITES
     local XML=""
-    local WHAT=""
-    local WITH=""
     local SUITE_FILE_XML=""
     cd "${MW_CORE_DIR}/tests/phpunit"
 
     SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/tests/phpunit/suite.xml")"
 
-    for suite in includes integration structure languages; do
+    for suite in $(find * -maxdepth 0 -type d); do
+      if [[ "${suite}" =~ ^(data|docs|mocks|suites)$ ]]; then
+        continue
+      fi
       SUITE_KB=0
       SUITE_PATHS=()
       SIZE_BY_PATH=()
@@ -81,14 +83,21 @@ function prepare_mw_paratest_phpunit_config() {
         SUITE_PATHS+=("${relative_path}")
         SIZE_BY_PATH[$relative_path]="${size}"
       done < <(
-        find "${suite}" \( -name '*Test.php' -o -name 'Test*.php' \) -printf '%p\t%k\n' | sort -rnk2
+        find "${suite}" \( -name '*Test.php' -o -name 'Test*.php' \) -printf '%p\t%k\n' | \
+        sort -k2,2nr -k1,1
       )
       [[ $CODE -eq 0 ]] || exit 2
 
-      SUBSUITE_MAX_KB=$((SUITE_KB / 100))
-      SUBSUITE_MAX_KB=$((SUBSUITE_MAX_KB < 10 ? 10 : SUBSUITE_MAX_KB))
-      SUBSUITE_MAX_PATHS=$(logbase4 "${#SUITE_PATHS[@]}")
-      SUBSUITE_MAX_PATHS=$((SUBSUITE_MAX_PATHS < 1 ? 1 : SUBSUITE_MAX_PATHS))
+      # Run order hack for MediaWikiIntegrationTestCaseSchema2Test
+      if [[ "${suite}" =~ ^(tests)$ ]]; then
+        SUBSUITE_MAX_KB=1000000000
+        SUBSUITE_MAX_PATHS=1000000000
+      else
+        SUBSUITE_MAX_KB=$((SUITE_KB / 100))
+        SUBSUITE_MAX_KB=$((SUBSUITE_MAX_KB < 16 ? 16 : SUBSUITE_MAX_KB))
+        SUBSUITE_MAX_PATHS=$(max_files_per_subsuite "${#SUITE_PATHS[@]}")
+        SUBSUITE_MAX_PATHS=$((SUBSUITE_MAX_PATHS < 1 ? 1 : SUBSUITE_MAX_PATHS))
+      fi
 
       SUBSUITES=()
       INDEX=0
@@ -114,13 +123,17 @@ function prepare_mw_paratest_phpunit_config() {
         SUBSUITES+=("<testsuite name=\"${suite}_${INDEX}\">"$'\n\t\t\t'"${XML}"$'\n\t\t'"</testsuite>")
       fi
 
-      WHAT="<testsuite name=\"${suite}\">"$'\n\t\t\t'"<directory>${suite}</directory>"$'\n\t\t'"</testsuite>"
-      printf -v WITH "%s\n\t\t" "${SUBSUITES[@]}"
-      WITH="${WITH%$'\n\t\t'}"
+      printf -v XML "%s\n\t\t" "${SUBSUITES[@]}"
+      XML="${XML%$'\n\t\t'}"
 
-      SUITE_FILE_XML="${SUITE_FILE_XML/$WHAT/$WITH}"
+      AUTO_SUITES+=("${XML}")
     done
 
+    printf -v XML "%s\n\t\t" "${AUTO_SUITES[@]}"
+    XML="${XML%$'\n\t\t'}"
+    XML="<testsuites>"$'\n\t\t'"${XML}"$'\n\t'"</testsuites>"
+
+    SUITE_FILE_XML="${SUITE_FILE_XML/<testsuites>*<\/testsuites>/$XML}"
     echo "${SUITE_FILE_XML}" | sudo -u www-data cat > "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
   )
 	echo "done"
@@ -144,7 +157,7 @@ function get_preserved_variables() {
   printenv | grep -Po 'PHPUNIT_[^=]+' | sed ':a;N;$!ba;s/\n/,/g'
 }
 
-function logbase4() {
+function max_files_per_subsuite() {
   declare -i REMNANT=$1
   declare -i LOG=-1;
   while [ $REMNANT -gt 0 ]; do
