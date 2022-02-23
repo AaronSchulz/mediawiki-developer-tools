@@ -68,7 +68,7 @@ git checkout 5.0.4
 sed -i.bak 's/"php": "^/"php": ">=/' composer.json
 sed -i.bak 's/phpstan-banned-code": "^/phpstan-banned-code": ">=/' composer.json
 composer.phar update
-ln -s bin/paratest ~/bin/paratest
+ln -s $(realpath ./bin/paratest) ~/bin/paratest
 </code>
 
 ## Mediawiki extension utilities ##

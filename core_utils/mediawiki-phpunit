@@ -188,7 +188,7 @@ function execute_mw_paratest() {
 
 	PARATEST_BIN="${HOME}/bin/paratest"
 	if [ ! -x "${PARATEST_BIN}" ]; then
-		echo "Could not find paratest; is composer/vendor/bin in PATH?"
+		echo "Could not find paratest at '${PARATEST_BIN}'"
 		exit 1
 	fi
 
