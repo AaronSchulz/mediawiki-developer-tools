@@ -57,7 +57,7 @@ function prepare_mw_paratest_phpunit_config() {
 		set -e
     declare -a PATHS
 		declare -i CLASSES_PER_SUITE;
-    declare -i SUBSUITE_INDEX
+    declare -i INDEX
     declare -a SUBSUITE_TAGS
     declare -a SUBSUITES
     local XML=""
@@ -166,7 +166,7 @@ function execute_mw_paratest() {
 	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 	local PROCESSES=$((1 * $(nproc --all)))
 
-	PARATEST_BIN="${HOME}/.config/composer/vendor/bin/paratest"
+	PARATEST_BIN="${HOME}/bin/paratest"
 	if [ ! -x "${PARATEST_BIN}" ]; then
 		echo "Could not find paratest; is composer/vendor/bin in PATH?"
 		exit 1
