@@ -134,8 +134,8 @@ function prepare_mw_paratest_phpunit_config() {
     XML="<testsuites>"$'\n\t\t'"${XML}"$'\n\t'"</testsuites>"
 
     SUITE_FILE_XML="${SUITE_FILE_XML/<testsuites>*<\/testsuites>/$XML}"
-    echo "${SUITE_FILE_XML}" | sudo -u www-data cat > "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
-  )
+    echo "${SUITE_FILE_XML}" | sudo -u www-data sh -c "cat > ""${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"""
+  ) || exit $?
 	echo "done"
 }
 
@@ -288,15 +288,15 @@ case $COMMAND in
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "srv_phpunit")
-	sync_srv_mediawiki || exit $?
 	SRV_MW_CORE="${SRV_MW_DIR}/core"
+	sync_srv_mediawiki || exit $?
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
 	execute_mw_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "srv_paratest")
-	sync_srv_mediawiki || exit $?
 	SRV_MW_CORE="${SRV_MW_DIR}/core"
+	sync_srv_mediawiki || exit $?
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_paratest_phpunit_config "${SRV_MW_CORE}" || exit $?
 	execute_mw_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
