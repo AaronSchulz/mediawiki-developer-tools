@@ -154,7 +154,8 @@ function sync_srv_mediawiki() {
 }
 
 function get_preserved_variables() {
-  printenv | grep -Po 'PHPUNIT_[^=]+' | sed ':a;N;$!ba;s/\n/,/g'
+  # Preserve environmental variables used to select test backends
+  printenv | grep -Po '(MW_INSTALL_PATH|PHPUNIT_[^=]+)' | sed ':a;N;$!ba;s/\n/,/g'
 }
 
 function max_files_per_subsuite() {
@@ -176,15 +177,14 @@ function execute_mw_phpunit() {
 		set -e
 		cd "${MW_CORE_DIR}"
 
-    # Preserve environmental variables used to select test backends
 		PRESERVE_ENV=$(get_preserved_variables)
 		if [ -n "${PRESERVE_ENV}" ]; then
 		  echo "Environmental variables: ${PRESERVE_ENV}"
 		fi
 
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-		  TMPDIR="${TMPDIR_MEDIAWIKI}" php "${PHP_ARGS[@]}" \
-			"./tests/phpunit/phpunit.php" \
+		  env TMPDIR="${TMPDIR_MEDIAWIKI}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+		  php "${PHP_ARGS[@]}" "./tests/phpunit/phpunit.php" \
 			--cache-result-file="${PHPUNIT_CACHE_FILE}" \
 			--colors=always \
 			"${PHPUNIT_ARGS[@]}" 2>&1
@@ -225,7 +225,8 @@ function execute_mw_paratest() {
 		# Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
 		# paratest a dummy bootstrap file in order to avoid shutdown warnings.
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-		  TMPDIR="${TMPDIR_MEDIAWIKI}" "${PARATEST_BIN}" \
+		  env TMPDIR="${TMPDIR_MEDIAWIKI}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+		  "${PARATEST_BIN}" \
 			--phpunit="tests/phpunit/phpunit.php" \
 			--configuration="tests/phpunit/mwp_suite.xml" \
 			--bootstrap="${BASE_DIR}/config/dummy.php" \
