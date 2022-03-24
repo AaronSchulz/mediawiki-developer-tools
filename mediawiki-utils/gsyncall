@@ -5,3 +5,5 @@
 (cd skins && ./git-all sync)
 
 (cd extensions && ./git-all sync)
+
+(cd core && sudo -u www-data php maintenance/update.php --quick)
