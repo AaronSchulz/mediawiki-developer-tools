@@ -53,7 +53,7 @@ for NODE in $NODES; do
 done
 # Create temporary /var/run directory on boot
 if [ ! -f "/usr/lib/tmpfiles.d/mysql-multi.conf" ]; then
-  echo "d /run/mysqld-multi 0755 mysql mysql  -" | sudo tee "/usr/lib/tmpfiles.d/mysql-multi.conf"
+  echo "d /run/mysqld-multi 0755 mysql mysql  -" | sudo tee "/etc/tmpfiles.d/mysql-multi.conf"
 fi
 
 # See /lib/systemd/system/mariadb@.service
