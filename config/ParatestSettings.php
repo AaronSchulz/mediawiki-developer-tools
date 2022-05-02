@@ -9,30 +9,37 @@ use Wikimedia\Rdbms\DatabaseSqlite;
  * @param string $cloneDbPath
  */
 function mwptInitSchemaClone( string $liveDbPath, string $cloneDbPath ) {
-	if ( is_file( $cloneDbPath ) ) {
-		if ( filesize( $cloneDbPath ) ) {
-			#return;
+	$fh = fopen( $cloneDbPath, 'c' );
+	if ( !flock( $fh, LOCK_EX ) ) {
+		throw new RuntimeException( "Failed to lock '$cloneDbPath'" );
+	}
+
+	$stat = fstat( $fh );
+	// Rebuild the temp "slot" DB unless it already existed and is expected to match the schema
+	if ( !$stat['size'] || ( time() - $stat['mtime'] ) > 15 ) {
+		ftruncate( $fh, 0 );
+
+		$dbl = DatabaseSqlite::newStandaloneInstance( $liveDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
+		$dbc = DatabaseSqlite::newStandaloneInstance( $cloneDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
+
+		$sqls = $dbl->selectFieldValues(
+			$dbl->addIdentifierQuotes( 'sqlite_master' ),
+			'sql',
+			[
+				'type' => [ 'index', 'table' ],
+				"name NOT " . $dbl->buildLike( 'sqlite_', $dbl->anyString() ),
+				"name NOT " . $dbl->buildLike( 'searchindex_', $dbl->anyString() ),
+				// @see MediaWikiIntegrationTestCase::DB_PREFIX
+				"name NOT " . $dbl->buildLike( 'unittest_', $dbl->anyString() )
+			]
+		);
+		foreach ( $sqls as $sql ) {
+			$dbc->query( $sql, __METHOD__, $dbc::QUERY_CHANGE_SCHEMA );
 		}
-		unlink( $cloneDbPath );
 	}
 
-	$dbl = DatabaseSqlite::newStandaloneInstance( $liveDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
-	$dbc = DatabaseSqlite::newStandaloneInstance( $cloneDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
-
-	$sqls = $dbl->selectFieldValues(
-		$dbl->addIdentifierQuotes( 'sqlite_master' ),
-		'sql',
-		[
-			'type' => [ 'index', 'table' ],
-			"name NOT " . $dbl->buildLike( 'sqlite_', $dbl->anyString() ),
-			"name NOT " . $dbl->buildLike( 'searchindex_', $dbl->anyString() ),
-			// @see MediaWikiIntegrationTestCase::DB_PREFIX
-			"name NOT " . $dbl->buildLike( 'unittest_', $dbl->anyString() )
-		]
-	);
-	foreach ( $sqls as $sql ) {
-		$dbc->query( $sql, __METHOD__, $dbc::QUERY_CHANGE_SCHEMA );
-	}
+	flock( $fh, LOCK_UN );
+	fclose( $fh );
 }
 
 function mwptModifyDirectories() {
@@ -41,13 +48,16 @@ function mwptModifyDirectories() {
     global $wgLocalisationCacheConf;
     global $wgDirectoryMode;
 
-    if ( getenv( 'TMPDIR' ) === false || getenv( 'TEST_TOKEN' ) === false ) {
+	$envTmpDir = getenv( 'TMPDIR' );
+	$envTestToken = getenv( 'TEST_TOKEN' );
+	$envTestRunNo = getenv( 'TEST_RUN_NO' );
+    if ( in_array( false, [ $envTmpDir, $envTestToken, $envTestRunNo ], true ) ) {
         // Not an invocation from paratest runner
         return;
     }
 
     // Use the temp dir for the slot assigned by paratest
-    $wgTmpDirectory = getenv( 'TMPDIR' ) . '/' . getenv( 'TEST_TOKEN' );
+    $wgTmpDirectory = "${envTmpDir}/${envTestToken}";
     // Make slot directory
     @mkdir( $wgTmpDirectory, $wgDirectoryMode );
 

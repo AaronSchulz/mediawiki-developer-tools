@@ -7,9 +7,9 @@ SCRIPT_BASENAME=$(basename "$REAL_PATH")
 
 COMMAND=$1
 
-declare -i NUM_RAND=$(od -A n -t u -N 4 /dev/urandom)
+declare -i TEST_RUN_NO=$(od -A n -t u -N 4 /dev/urandom)
 TMP_SUBDIR_PREFIX="mw-phpunit"
-TMP_SUBDIR_NAME="${TMP_SUBDIR_PREFIX}.${NUM_RAND}"
+TMP_SUBDIR_NAME="${TMP_SUBDIR_PREFIX}.${TEST_RUN_NO}"
 
 shift 1
 declare -a ARGS=("$@")
@@ -20,27 +20,27 @@ function print_usage() {
 
 function prepare_mw_temp_dir() {
 	local TMPDIR_MOUNT=$1
-	local TMPDIR_MEDIAWIKI="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
+	local MW_TMPDIR="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
 
 	if [ ! -d "${TMPDIR_MOUNT}" ]; then
 		echo "Invalid temp file mount path: ${TMPDIR_MOUNT}" >&2
 		exit 127
 	fi
 
-	echo -n "Preparing '${TMPDIR_MEDIAWIKI}'..."
-	if [ ! -d "${TMPDIR_MEDIAWIKI}" ]; then
-	  sudo -u www-data mkdir -p "${TMPDIR_MEDIAWIKI}" || exit $?
+	echo -n "Preparing '${MW_TMPDIR}'..."
+	if [ ! -d "${MW_TMPDIR}" ]; then
+	  sudo -u www-data mkdir -p "${MW_TMPDIR}" || exit $?
   fi
 	echo "done"
 }
 
 function clean_mw_temp_dir() {
 	local TMPDIR_MOUNT=$1
-	local TMPDIR_MEDIAWIKI="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
+	local MW_TMPDIR="${TMPDIR_MOUNT}/${TMP_SUBDIR_NAME}"
 
-	echo -n "Clearing '${TMPDIR_MEDIAWIKI}'..."
-	if [ -d "${TMPDIR_MEDIAWIKI}" ]; then
-		sudo -u www-data rm -rf "${TMPDIR_MEDIAWIKI}" || exit $?
+	echo -n "Clearing '${MW_TMPDIR}'..."
+	if [ -d "${MW_TMPDIR}" ]; then
+		sudo -u www-data rm -rf "${MW_TMPDIR}" || exit $?
 	fi
 	echo "done"
 
@@ -171,7 +171,7 @@ function max_files_per_subsuite() {
 function execute_mw_phpunit() {
 	local MW_CORE_DIR=$1
 	local TMPFS_DIR=$2
-	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
+	local MW_TMPDIR="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 
 	(
 		set -e
@@ -183,7 +183,7 @@ function execute_mw_phpunit() {
 		fi
 
 		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-		  env TMPDIR="${TMPDIR_MEDIAWIKI}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+		  env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
 		  php "${PHP_ARGS[@]}" "./tests/phpunit/phpunit.php" \
 			--cache-result-file="${PHPUNIT_CACHE_FILE}" \
 			--colors=always \
@@ -196,7 +196,7 @@ function execute_mw_paratest() {
 	local TMPFS_DIR=$2
 	local PARATEST_BIN="",
 	local PRESERVE_ENV=""
-	local TMPDIR_MEDIAWIKI="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
+	local MW_TMPDIR="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 	local PROCESSES=$((1 * $(nproc --all)))
 
 	PARATEST_BIN="${HOME}/bin/paratest"
@@ -224,13 +224,14 @@ function execute_mw_paratest() {
 		# XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
 		# Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
 		# paratest a dummy bootstrap file in order to avoid shutdown warnings.
-		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-		  env TMPDIR="${TMPDIR_MEDIAWIKI}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+		exec sudo -u www-data -H \
+		  --preserve-env="${PRESERVE_ENV}" \
+		  env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
 		  "${PARATEST_BIN}" \
 			--phpunit="tests/phpunit/phpunit.php" \
 			--configuration="tests/phpunit/mwp_suite.xml" \
 			--bootstrap="${BASE_DIR}/config/dummy.php" \
-			--tmp-dir="${TMPDIR_MEDIAWIKI}" \
+			--tmp-dir="${MW_TMPDIR}" \
 			--processes="${PROCESSES}" \
 			--parallel-suite \
 			--colors \
