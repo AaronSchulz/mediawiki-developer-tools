@@ -20,15 +20,9 @@ for NODE in $NODES; do
   echo "Unregistering/stopping any prior ${NODE} service..."
   sudo systemctl stop "mariadb@${NODE}.service"
   sudo systemctl disable "mariadb@${NODE}.service"
-
-  if [ $RESET -eq 1 ]; then
-    echo "Clearing ${NODE} directories"
-    sudo rm -rf "/var/lib/mysql-multi/${NODE}" || exit $?
-    sudo rm -rf "/var/log/mysql-multi/${NODE}" || exit $?
-  fi
 done
 
-echo 'Setting multi-instance directories...'
+echo 'Setting base directories...'
 if [ ! -d "/var/lib/mysql-multi" ]; then
   sudo mkdir "/var/lib/mysql-multi" || exit $?
   sudo chown -R mysql:mysql "/var/lib/mysql-multi" || exit $?
@@ -41,30 +35,38 @@ if [ ! -d "/run/mysql-multi" ]; then
   sudo mkdir "/run/mysql-multi" || exit $?
   sudo chown -R mysql:mysql "/run/mysql-multi" || exit $?
 fi
+if [ ! -f "/usr/lib/tmpfiles.d/mysql-multi.conf" ]; then
+  # Create temporary /var/run directory on boot
+  echo "d /run/mysqld-multi 0755 mysql mysql  -" | sudo tee "/etc/tmpfiles.d/mysql-multi.conf"
+fi
 for NODE in $NODES; do
+  if [ $RESET -eq 1 ]; then
+    echo "Removing ${NODE} data directories"
+    sudo rm -rf "/var/lib/mysql-multi/${NODE}" || exit $?
+    sudo rm -rf "/var/log/mysql-multi/${NODE}" || exit $?
+  fi
   if [ ! -d "/var/lib/mysql-multi/${NODE}" ]; then
+    echo "Setting ${NODE} data directory"
     sudo mkdir "/var/lib/mysql-multi/${NODE}" || exit $?
     sudo chown -R mysql "/var/lib/mysql-multi/${NODE}" || exit $?
   fi
   if [ ! -d "/var/log/mysql-multi/${NODE}" ]; then
+    echo "Setting ${NODE} log directory"
     sudo mkdir -m 0774 "/var/log/mysql-multi/${NODE}" || exit $?
     sudo chown -R mysql:adm "/var/log/mysql-multi/${NODE}" || exit $?
   fi
 done
-# Create temporary /var/run directory on boot
-if [ ! -f "/usr/lib/tmpfiles.d/mysql-multi.conf" ]; then
-  echo "d /run/mysqld-multi 0755 mysql mysql  -" | sudo tee "/etc/tmpfiles.d/mysql-multi.conf"
-fi
 
 # See /lib/systemd/system/mariadb@.service
-echo 'Setting multi-instance config...'
 sudo echo -n > "multi-server-client.cnf"
 for NODE in $NODES; do
+  echo "Setting ${NODE} config..."
   NODE_ID=$(echo "${NODE}" | grep -Po '\d+$')
   sed -e "s/#NODE#/${NODE}/g;s/#NODE_ID#/${NODE_ID}/g;s/#NODE_SECTION#/${NODE}/g" "${BASE_DIR}/server-client-NODE.cnf" >> "multi-server-client.cnf" || exit $?
   sed -e "s/#NODE#/${NODE}/g;s/#NODE_ID#/${NODE_ID}/g;s/.#NODE_SECTION#//g" "${BASE_DIR}/server-client-NODE.cnf" > "${NODE}.cnf" || exit $?
   sudo cp "${NODE}.cnf" "/etc/mysql/" || exit $?
 done
+echo 'Setting combined config...'
 sudo cp "multi-server-client.cnf" "/etc/mysql/conf.d/100-multi-server-client.cnf" || exit $?
 
 for NODE in $NODES; do

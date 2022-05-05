@@ -2,9 +2,9 @@
 
 REAL_PATH=$(realpath "$0")
 BASE_DIR=$(dirname "$REAL_PATH")
-NODES=("db1 db2 db3 db4")
+NODES=("db1 db2 db3")
 PRIMARY_NODE="db1"
-REPLICA_NODES=("db2 db3 db4")
+REPLICA_NODES=("db2 db3")
 
 PASS=$1
 if [ -z "${PASS}" ]; then
