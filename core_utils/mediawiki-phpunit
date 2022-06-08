@@ -69,7 +69,7 @@ function prepare_mw_paratest_phpunit_config() {
     local SUITE_FILE_XML=""
     cd "${MW_CORE_DIR}/tests/phpunit"
 
-    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/tests/phpunit/suite.xml")"
+    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/phpunit.xml.dist")"
 
     for suite in $(find * -maxdepth 0 -type d); do
       if [[ "${suite}" =~ ^(data|docs|mocks|suites)$ ]]; then
