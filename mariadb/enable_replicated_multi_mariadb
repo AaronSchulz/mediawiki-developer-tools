@@ -24,7 +24,7 @@ echo "CREATE USER IF NOT EXISTS 'repl'@'127.0.0.1' IDENTIFIED BY '${PASS}'; GRAN
 echo "Configuring grants for ptheartbeat on ${PRIMARY_NODE}..."
 echo "CREATE USER IF NOT EXISTS 'ptheartbeat'@'127.0.0.1' IDENTIFIED BY '${PASS}'; GRANT REPLICATION CLIENT, SLAVE MONITOR ON *.* TO 'ptheartbeat'@'127.0.0.1'; GRANT CREATE, INSERT, UPDATE, SELECT ON heartbeat.* TO 'ptheartbeat'@'127.0.0.1';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
 
-# pt-heartbeat -D my_wiki -h 127.0.0.1 -P 3316 --update --create-table --user ptheartbeat --password ${PASS} --interval 0.25 --utc --daemonize
+# pt-heartbeat -D heartbeat -h 127.0.0.1 -P 3316 --update --create-table --user ptheartbeat --password ${PASS} --interval 0.25 --utc --daemonize
 
 echo "Getting GTID info for ${PRIMARY_NODE}..."
 GTID_MASTER_POS=$(echo "select @@gtid_current_pos" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B | tail -n 1)
