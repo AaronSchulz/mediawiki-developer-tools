@@ -61,4 +61,10 @@ for NODE in $REPLICA_NODES; do
   echo "START SLAVE;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
   echo "SET GLOBAL READ_ONLY = ON;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
   echo "SHOW REPLICA STATUS\G" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
+
+  echo "Enabling semi-sync replication on ${NODE}..."
+  echo "SET GLOBAL rpl_semi_sync_slave_enabled=ON;" | sudo mariadb --defaults-group-suffix=".${NODE}" -B || exit $?
 done
+
+echo "Enabling semi-sync replication on ${PRIMARY_NODE}..."
+echo "SET GLOBAL rpl_semi_sync_master_enabled=ON;" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
