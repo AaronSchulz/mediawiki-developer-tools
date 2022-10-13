@@ -11,3 +11,4 @@ log_error               = /var/log/mysql-multi/#NODE#/error.log
 log_basename            = #NODE#
 server_id               = 1#NODE_ID#
 performance_schema      = on
+replicate-wild-ignore-table = %.unittest_%
