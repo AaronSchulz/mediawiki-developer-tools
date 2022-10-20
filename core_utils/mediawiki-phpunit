@@ -259,6 +259,7 @@ declare -a PHP_ARGS
 # Optimize execution via OPCache
 if [ -d /opcache/php ]; then
 	echo "Using shared OPCache directory: /opcache/php"
+	PHP_ARGS+=("-d opcache.jit=1255")
 	PHP_ARGS+=("-d opcache.enable=1")
 	PHP_ARGS+=("-d opcache.enable_cli=1")
 	PHP_ARGS+=("-d opcache.file_cache=/opcache/php")
