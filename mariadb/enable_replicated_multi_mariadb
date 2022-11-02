@@ -18,6 +18,9 @@ for NODE in $NODES; do
   sudo systemctl start "mariadb@${NODE}.service" || exit $?
 done
 
+echo "Configuring database for ptheartbeat on ${PRIMARY_NODE}..."
+echo "CREATE DATABASE IF NOT EXISTS heartbeat;" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
+
 echo "Configuring grants for repl on ${PRIMARY_NODE}..."
 echo "CREATE USER IF NOT EXISTS 'repl'@'127.0.0.1' IDENTIFIED BY '${PASS}'; GRANT REPLICATION SLAVE ON *.* TO 'repl'@'127.0.0.1';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
 
