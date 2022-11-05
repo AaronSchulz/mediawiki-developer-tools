@@ -1,0 +1,19 @@
+#!/bin/bash
+
+NODE=$1
+shift
+
+if [ -z "${NODE}" ]; then
+	echo "Usage: mmariadb-dump <group suffix> <mariadb-dump arguments>"
+	exit 1;
+fi
+
+if [ ! -f "/etc/mysql/${NODE}.cnf" ]; then
+	echo "Could not find /etc/mysql/${NODE}.cnf"
+	exit 1;
+fi
+
+sudo mariadb-dump --defaults-group-suffix=".${NODE}" --single-transaction --master-data=2 --all-databases "$@"
+
+# mmariadb-dump db1 > my_wiki.dump
+# mmariadb db2 < my_wiki.dump
