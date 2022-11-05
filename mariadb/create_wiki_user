@@ -1,0 +1,26 @@
+#!/bin/bash
+
+REAL_PATH=$(realpath "$0")
+BASE_DIR=$(dirname "$REAL_PATH")
+NODES=("db1 db2 db3 db4")
+PRIMARY_NODE="db1"
+REPLICA_NODES=("db2 db3 db4")
+
+USER=$1
+HOSTNAME=$2
+PASSWORD=$3
+DATABASE=$4
+if [ -z "${USER}" -o -z "${HOSTNAME}" -o -z "${PASSWORD}" -o -z "${DATABASE}" ]; then
+  echo "Usage: create_wiki_user <USERNAME> <HOSTNAME> <PASSWORD> <DATABASE>"
+  exit 1
+fi
+
+cd ~
+
+echo "CREATE USER IF NOT EXISTS '${USER}'@'${HOSTNAME}' IDENTIFIED BY '${PASSWORD}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B || exit $?
+echo "CREATE DATABASE IF NOT EXISTS ${DATABASE};" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B
+echo "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${USER}'@'${HOSTNAME}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B
+
+echo "GRANT SLAVE MONITOR ON *.* TO '${USER}'@'${HOSTNAME}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B
+echo "GRANT BINLOG MONITOR ON *.* TO '${USER}'@'${HOSTNAME}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B
+echo "GRANT SELECT ON heartbeat.* TO '${USER}'@'${HOSTNAME}';" | sudo mariadb --defaults-group-suffix=".${PRIMARY_NODE}" -B
