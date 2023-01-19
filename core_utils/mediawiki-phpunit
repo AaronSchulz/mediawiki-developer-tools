@@ -199,12 +199,6 @@ function execute_mw_paratest() {
 	local MW_TMPDIR="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 	local PROCESSES=$((1 * $(nproc --all)))
 
-	PARATEST_BIN="${HOME}/bin/paratest"
-	if [ ! -x "${PARATEST_BIN}" ]; then
-		echo "Could not find paratest at '${PARATEST_BIN}'"
-		exit 1
-	fi
-
 	(
 		set -e
 		cd "${MW_CORE_DIR}"
@@ -221,23 +215,39 @@ function execute_mw_paratest() {
 		  echo "Environmental variables detected: ${PRESERVE_ENV}"
 		fi
 
-		# XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
-		# Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
-		# paratest a dummy bootstrap file in order to avoid shutdown warnings.
-		exec sudo -u www-data -H \
-		  --preserve-env="${PRESERVE_ENV}" \
-		  env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
-		  "${PARATEST_BIN}" \
-			--phpunit="tests/phpunit/phpunit.php" \
-			--configuration="tests/phpunit/mwp_suite.xml" \
-			--bootstrap="${BASE_DIR}/config/dummy.php" \
-			--tmp-dir="${MW_TMPDIR}" \
-			--processes="${PROCESSES}" \
-			--parallel-suite \
-			--colors \
-			--passthru-php="${PHP_ARGS[*]}" \
-			--passthru="${PHPUNIT_ARGS[*]}" \
-			--verbose="$(($VERBOSE))"
+    if [ -x "${MW_CORE_DIR}/vendor/bin/paratest" ]; then
+      exec sudo -u www-data -H \
+        --preserve-env="${PRESERVE_ENV}" \
+        env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+        phpdev "${MW_CORE_DIR}/vendor/bin/paratest" \
+        --tmp-dir="${MW_TMPDIR}" \
+        --processes="${PROCESSES}" \
+        --colors="always" \
+        --passthru-php="${PHP_ARGS[*]}" \
+        --passthru="${PHPUNIT_ARGS[*]}" \
+        --verbose
+    elif [ -x "${HOME}/bin/paratest" ]; then
+      # XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
+      # Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
+      # paratest a dummy bootstrap file in order to avoid shutdown warnings.
+      exec sudo -u www-data -H \
+        --preserve-env="${PRESERVE_ENV}" \
+        env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+        "${HOME}/bin/paratest" \
+        --phpunit="tests/phpunit/phpunit.php" \
+        --configuration="tests/phpunit/mwp_suite.xml" \
+        --bootstrap="${BASE_DIR}/config/dummy.php" \
+        --tmp-dir="${MW_TMPDIR}" \
+        --processes="${PROCESSES}" \
+        --parallel-suite \
+        --colors \
+        --passthru-php="${PHP_ARGS[*]}" \
+        --passthru="${PHPUNIT_ARGS[*]}" \
+        --verbose="$(($VERBOSE))"
+    else
+      echo "Could not find paratest at '${PARATEST_BIN}'"
+      exit 1
+    fi
 	)
 }
 
