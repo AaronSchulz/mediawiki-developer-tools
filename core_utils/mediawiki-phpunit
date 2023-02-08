@@ -50,9 +50,15 @@ function clean_mw_temp_dir() {
 }
 
 function prepare_mw_paratest_phpunit_config() {
+  prepare_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml.dist"
+  prepare_mw_paratest_phpunit_config_file "$1" "tests/phpunit/mwp_suite.xml"
+}
+
+function prepare_mw_paratest_phpunit_config_file() {
 	local MW_CORE_DIR=$1
+	local FILE_RELPATH=$2
 	# XXX: ugly work-around poorly divided suites
-	echo -n "Creating '${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml'..."
+	echo -n "Creating '${MW_CORE_DIR}/${FILE_RELPATH}'..."
 	(
 		set -e
     declare -a SUITE_PATHS
@@ -67,9 +73,13 @@ function prepare_mw_paratest_phpunit_config() {
     declare -a AUTO_SUITES
     local XML=""
     local SUITE_FILE_XML=""
+    local OUTPUT_BASE_PATH=""
     cd "${MW_CORE_DIR}/tests/phpunit"
 
     SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/phpunit.xml.dist")"
+    if [[ "$(dirname "${FILE_RELPATH}")" == "." ]]; then
+      OUTPUT_BASE_PATH="tests/phpunit/"
+    fi
 
     for suite in $(find * -maxdepth 0 -type d); do
       if [[ "${suite}" =~ ^(data|docs|mocks|suites)$ ]]; then
@@ -79,6 +89,7 @@ function prepare_mw_paratest_phpunit_config() {
       SUITE_PATHS=()
       SIZE_BY_PATH=()
       while IFS=$'\t\n' read -r relative_path size && CODE=$?; do
+        relative_path="${OUTPUT_BASE_PATH}${relative_path}"
         SUITE_KB=$((SUITE_KB + size))
         SUITE_PATHS+=("${relative_path}")
         SIZE_BY_PATH[$relative_path]="${size}"
@@ -123,10 +134,11 @@ function prepare_mw_paratest_phpunit_config() {
         SUBSUITES+=("<testsuite name=\"${suite}_${INDEX}\">"$'\n\t\t\t'"${XML}"$'\n\t\t'"</testsuite>")
       fi
 
-      printf -v XML "%s\n\t\t" "${SUBSUITES[@]}"
-      XML="${XML%$'\n\t\t'}"
-
-      AUTO_SUITES+=("${XML}")
+      if [ ${#SUBSUITES[@]} -gt 0 ]; then
+        printf -v XML "%s\n\t\t" "${SUBSUITES[@]}"
+        XML="${XML%$'\n\t\t'}"
+        AUTO_SUITES+=("${XML}")
+      fi
     done
 
     printf -v XML "%s\n\t\t" "${AUTO_SUITES[@]}"
@@ -134,17 +146,23 @@ function prepare_mw_paratest_phpunit_config() {
     XML="<testsuites>"$'\n\t\t'"${XML}"$'\n\t'"</testsuites>"
 
     SUITE_FILE_XML="${SUITE_FILE_XML/<testsuites>*<\/testsuites>/$XML}"
-    echo "${SUITE_FILE_XML}" | sudo -u www-data sh -c "cat > ""${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"""
+    echo "${SUITE_FILE_XML}" | sudo -u www-data sh -c "cat > ""${MW_CORE_DIR}/${FILE_RELPATH}"""
   ) || exit $?
 	echo "done"
 }
 
 function clean_mw_paratest_phpunit_config() {
+  clean_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml.dist"
+  clean_mw_paratest_phpunit_config_file "$1" "tests/phpunit/mwp_suite.xml"
+}
+
+function clean_mw_paratest_phpunit_config_file() {
 	local MW_CORE_DIR=$1
+	local FILE_RELPATH=$2
 
 	# XXX: ugly work-around poorly divided suites
-	echo -n "Removing '${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml'..."
-  sudo -u www-data rm -f "${MW_CORE_DIR}/tests/phpunit/mwp_suite.xml"
+	echo -n "Removing '${MW_CORE_DIR}/${FILE_RELPATH}'..."
+  sudo -u www-data rm -f "${MW_CORE_DIR}/${FILE_RELPATH}"
 	echo "done"
 }
 
@@ -220,12 +238,13 @@ function execute_mw_paratest() {
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
         phpdev "${MW_CORE_DIR}/vendor/bin/paratest" \
+        --configuration="mwp_phpunit.xml.dist" \
         --tmp-dir="${MW_TMPDIR}" \
         --processes="${PROCESSES}" \
+        --parallel-suite \
         --colors="always" \
         --passthru-php="${PHP_ARGS[*]}" \
-        --passthru="${PHPUNIT_ARGS[*]}" \
-        --verbose
+        --passthru="${PHPUNIT_ARGS[*]}"
     elif [ -x "${HOME}/bin/paratest" ]; then
       # XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
       # Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
@@ -233,7 +252,7 @@ function execute_mw_paratest() {
       exec sudo -u www-data -H \
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
-        "${HOME}/bin/paratest" \
+        phpdev "${HOME}/bin/paratest" \
         --phpunit="tests/phpunit/phpunit.php" \
         --configuration="tests/phpunit/mwp_suite.xml" \
         --bootstrap="${BASE_DIR}/config/dummy.php" \
