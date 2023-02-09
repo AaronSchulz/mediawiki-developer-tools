@@ -250,6 +250,7 @@ function execute_mw_paratest() {
         --configuration="mwp_phpunit.xml.dist" \
         --tmp-dir="${MW_TMPDIR}" \
         --processes="${PROCESSES}" \
+        --runner="Runner" \
         --parallel-suite \
         --colors="always" \
         --passthru-php="${PHP_ARGS[*]}" \
@@ -267,6 +268,7 @@ function execute_mw_paratest() {
         --bootstrap="${BASE_DIR}/config/dummy.php" \
         --tmp-dir="${MW_TMPDIR}" \
         --processes="${PROCESSES}" \
+        --runner="Runner" \
         --parallel-suite \
         --colors \
         --passthru-php="${PHP_ARGS[*]}" \
@@ -294,15 +296,9 @@ fi
 declare PHPUNIT_CACHE_FILE="${TMPDIR_MOUNT}/mw-phpunit-cache.${COMMAND}"
 
 declare -a PHP_ARGS
-# Optimize execution via OPCache
+# Optimize execution via OPCache (see opcache-cli.ini)
 if [ -d /opcache/php ]; then
-	echo "Using shared OPCache directory: /opcache/php"
-	PHP_ARGS+=("-d opcache.jit=1255")
-	PHP_ARGS+=("-d opcache.enable_cli=1")
-	PHP_ARGS+=("-d opcache.jit_buffer_size=128M")
-	PHP_ARGS+=("-d opcache.file_cache=/opcache/php")
-	PHP_ARGS+=("-d opcache.file_cache_only=1")
-	PHP_ARGS+=("-d opcache.lockfile_path=/opcache/php")
+	echo "Detected shared OPCache directory: /opcache/php"
 fi
 
 declare -a PHPUNIT_ARGS
