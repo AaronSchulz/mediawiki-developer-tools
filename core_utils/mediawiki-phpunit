@@ -200,12 +200,21 @@ function execute_mw_phpunit() {
 		  echo "Environmental variables: ${PRESERVE_ENV}"
 		fi
 
-		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-		  env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
-		  php "${PHP_ARGS[@]}" "./tests/phpunit/phpunit.php" \
-			--cache-result-file="${PHPUNIT_CACHE_FILE}" \
-			--colors=always \
-			"${PHPUNIT_ARGS[@]}" 2>&1
+		if [ -x "${MW_CORE_DIR}/vendor/bin/paratest" ]; then
+			exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
+				env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+				php "${PHP_ARGS[@]}" "${MW_CORE_DIR}/vendor/bin/phpunit" \
+				--cache-result-file="${PHPUNIT_CACHE_FILE}" \
+				--colors=always \
+				"${PHPUNIT_ARGS[@]}" 2>&1
+		else
+			exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
+				env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
+				php "${PHP_ARGS[@]}" "${MW_CORE_DIR}/tests/phpunit/phpunit.php" \
+				--cache-result-file="${PHPUNIT_CACHE_FILE}" \
+				--colors=always \
+				"${PHPUNIT_ARGS[@]}" 2>&1
+		fi
 	)
 }
 
@@ -237,7 +246,7 @@ function execute_mw_paratest() {
       exec sudo -u www-data -H \
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
-        phpdev "${MW_CORE_DIR}/vendor/bin/paratest" \
+        php "${MW_CORE_DIR}/vendor/bin/paratest" \
         --configuration="mwp_phpunit.xml.dist" \
         --tmp-dir="${MW_TMPDIR}" \
         --processes="${PROCESSES}" \
@@ -252,7 +261,7 @@ function execute_mw_paratest() {
       exec sudo -u www-data -H \
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
-        phpdev "${HOME}/bin/paratest" \
+        php "${HOME}/bin/paratest" \
         --phpunit="tests/phpunit/phpunit.php" \
         --configuration="tests/phpunit/mwp_suite.xml" \
         --bootstrap="${BASE_DIR}/config/dummy.php" \
