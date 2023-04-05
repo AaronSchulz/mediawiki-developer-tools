@@ -207,7 +207,7 @@ function cmd_reset_origin_master() {
 
 		# Note that REMOTE_ORIGIN_SHA1 might be higher than what is known in .git
 		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		if [ "${INDEX_SYNCED}" -ne 1 ]; then
+		if [[ "${INDEX_SYNCED}" -ne 1 ]]; then
 			# Check if the repo is in working condition
 			echo -n "Checking integrity of ${REPO}..."
 			VALID_GIT_REPO=$(check_git_repo_is_valid "${REPO}")
@@ -226,7 +226,7 @@ function cmd_reset_origin_master() {
 		# Stash any working copy changes checkout/reset master
 		CHANGES=$(git status -s --ignore-submodule --untracked-file=no | wc -l)
 		[ "$CHANGES" -ge 0 ] || git stash
-		if [ "${INDEX_SYNCED}" -ne 1 ]; then
+		if [[ "${INDEX_SYNCED}" -ne 1 ]]; then
 			echo "Resetting ${REPO} to ${REMOTE_ORIGIN_SHA1:0:7}"
 			git checkout master -qf
 			git reset --hard origin/master
