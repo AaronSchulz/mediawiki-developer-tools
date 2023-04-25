@@ -1,6 +1,6 @@
 <?php
 
-use Wikimedia\Rdbms\DatabaseSqlite;
+use Wikimedia\Rdbms\DatabaseFactory;
 
 /**
  * Make an empty DB with the same schema as the reference DB
@@ -19,8 +19,8 @@ function mwptInitSchemaClone( string $liveDbPath, string $cloneDbPath ) {
 	if ( !$stat['size'] || ( time() - $stat['mtime'] ) > 15 ) {
 		ftruncate( $fh, 0 );
 
-		$dbl = DatabaseSqlite::newStandaloneInstance( $liveDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
-		$dbc = DatabaseSqlite::newStandaloneInstance( $cloneDbPath, [ 'trxMode' => 'IMMEDIATE' ] );
+        $dbl = mwptSqliteHandle( $liveDbPath );
+		$dbc = mwptSqliteHandle( $cloneDbPath );
 
 		$sqls = $dbl->selectFieldValues(
 			$dbl->addIdentifierQuotes( 'sqlite_master' ),
@@ -40,6 +40,17 @@ function mwptInitSchemaClone( string $liveDbPath, string $cloneDbPath ) {
 
 	flock( $fh, LOCK_UN );
 	fclose( $fh );
+    
+    if ( headers_sent() ) moo();
+}
+
+function mwptSqliteHandle( $filename ) {
+    $p['dbFilePath'] = $filename;
+    $p['schema'] = null;
+    $p['tablePrefix'] = '';
+    $p['trxMode'] = 'IMMEDIATE';
+
+    return ( new DatabaseFactory() )->create( 'sqlite', $p );
 }
 
 function mwptModifyDirectories() {
