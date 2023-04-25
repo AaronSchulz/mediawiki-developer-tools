@@ -52,6 +52,9 @@ alias winwhere="/mnt/c/Windows/System32/where.exe"
 # Fast OPCache-based PHP scripts
 alias wphp='sudo -u www-data php'
 
+# Convenience launcher for MediaWiki maintenance scripts
+alias mwscript='sudo -u www-data --preserve-env=MW_DB php "${DEV_MW_DIR}/core/maintenance/run.php"'
+
 # Convenience wrapper to synchronize /srv/mediawiki with PhpStormProjects/mediawiki
 alias syncsrvmediawiki="sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR ${HOME}/bin/sync-srv-mediawiki"
 
