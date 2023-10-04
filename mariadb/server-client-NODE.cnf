@@ -15,3 +15,4 @@ performance_schema      = on
 rpl_semi_sync_master_enabled = 1
 rpl_semi_sync_slave_enabled = 1
 replicate-wild-ignore-table = %.unittest_%
+innodb_print_all_deadlocks = on
