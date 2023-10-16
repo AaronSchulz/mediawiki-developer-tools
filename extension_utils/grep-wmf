@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-WMF_EXTS_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
-CACHE_FILE="$HOME/.WMF_MEDIAWIKI_EXTENSION_LIST"
-
+BASE_DIR=$(dirname $(realpath $0))
 DIRECTORY=$(basename "$(pwd -P)")
 
 if [ "$DIRECTORY" != "extensions" ]; then
@@ -10,18 +8,9 @@ if [ "$DIRECTORY" != "extensions" ]; then
 	exit 127
 fi
 
-if [ -n $(find "$CACHE_FILE" -maxdepth 0 -mmin -120 -size +1k 2>/dev/null) ]; then
-	# Exclude nested repositories for directory layout sanity
-	# shellcheck disable=SC2016
-	wget -qO- "$WMF_EXTS_URL" | grep -P '^\$IP/extensions/[^/]+/[^/]+$' |
-		awk -F/ '{print $3}' \
-		>"${CACHE_FILE}"
-	[ $? -eq 0 ] || exit $?
-fi
-
-mapfile -t REPO_NAMES <"$CACHE_FILE"
+mapfile -t WMF_REPO_NAMES < <("${BASE_DIR}/list-extensions" wmf)
 mapfile -t REPO_NAMES_MATCH < <(
-	grep -rls --exclude-dir=".git" "$@" "${REPO_NAMES[@]}" | \
+	grep -rls --exclude-dir=".git" "$@" "${WMF_REPO_NAMES[@]}" | \
 	grep -Po '^[^/]+' | \
 	uniq
 )

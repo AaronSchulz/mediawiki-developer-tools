@@ -113,6 +113,7 @@ The must be run in a folder called "extensions" that contains the extension repo
 
 * grep-all: searches all extension repos and groups output by repo
 * grep-wmf: searches only extensions enabled on Wikimedia productions sites and groups output by repo 
+* grep-nonwmf: searches only extensions not enabled on Wikimedia productions sites and groups output by repo
 
 ## SystemD multi-instance MariaDB helpers ##
 A set of scripts are included for quickly setting up replication on a single machine using mariadb.

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+BASE_DIR=$(dirname $(realpath $0))
 DIRECTORY=$(basename "$(pwd -P)")
 
 if [ "$DIRECTORY" != "extensions" ]; then
@@ -7,8 +8,9 @@ if [ "$DIRECTORY" != "extensions" ]; then
 	exit 127
 fi
 
+mapfile -t WMF_REPO_NAMES < <("${BASE_DIR}/list-extensions" nonwmf)
 mapfile -t REPO_NAMES_MATCH < <(
-	grep -rls --exclude-dir=".git" "$@" | \
+	grep -rls --exclude-dir=".git" "$@" "${WMF_REPO_NAMES[@]}" | \
 	grep -Po '^[^/]+' | \
 	uniq
 )

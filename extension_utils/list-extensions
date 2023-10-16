@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+GERRIT_URL_SSH="ssh://gerrit.wikimedia.org:29418"
+GERRIT_URL_HTTPS="https://gerrit.wikimedia.org"
+
+# Note: this handles the case where the bash script is a symlink to the Git repo version
+SCRIPT_BASENAME=$(basename "$(realpath "$0")")
+DIRECTORY=$(basename "$(pwd -P)")
+
+CATEGORY=$1
+
+if [ "$DIRECTORY" == "extensions" ]; then
+  GERRIT_EXT_DIR="mediawiki/extensions/"
+  EXTLIST_ALL_URL="${GERRIT_URL_HTTPS}/r/projects/?format=text&b=master&p=mediawiki%2Fextensions%2F"
+  EXTLIST_ALL_REGEX='^[a-f0-9]{40} mediawiki/extensions/[^/]+$'
+  EXTLIST_WMF_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
+  EXTLIST_WMF_REGEX='^\$IP/extensions/[^/]+/[^/]+$'
+elif [ "$DIRECTORY" == "skins" ]; then
+  GERRIT_EXT_DIR="mediawiki/skins/"
+  EXTLIST_ALL_URL="${GERRIT_URL_HTTPS}/r/projects/?format=text&b=master&p=mediawiki%2Fskins%2F"
+  EXTLIST_ALL_REGEX='^[a-f0-9]{40} mediawiki/skins/[^/]+$'
+  EXTLIST_WMF_URL="https://raw.githubusercontent.com/wikimedia/OPERATIONs-mediawiki-config/master/wmf-config/extension-list"
+  EXTLIST_WMF_REGEX='^\$IP/skins/[^/]+/[^/]+$'
+else
+	echo "${SCRIPT_BASENAME} must run in the 'extensions' or 'skins' directory" >&2
+	exit 127
+fi
+
+function print_usage() {
+	echo "Usage: ${SCRIPT_BASENAME} <all|wmf|nonwmf>"
+}
+
+function get_upstream_url_contents_cached() {
+	local URL=$1
+	local HASH
+	local CACHE
+	HASH=$(echo -n "${URL}" | md5sum | awk '{print $1}')
+	CACHE="$HOME/.mw_extlist_$HASH.cache"
+	if [ -z "$(find "$CACHE" -maxdepth 0 -mmin -120 -size +1k 2>/dev/null)" ]; then
+		# Exclude nested repositories for directory layout sanity
+		# shellcheck disable=SC2016
+		wget -qO- "${URL}" > "${CACHE}"
+	fi
+	[ -f "${CACHE}" ] || exit 1
+	cat "${CACHE}"
+}
+
+function get_upstream_plugins_all() {
+	# Exclude nested repositories for directory layout sanity
+	# shellcheck disable=SC2016
+	get_upstream_url_contents_cached "${EXTLIST_ALL_URL}" | \
+		grep -P "${EXTLIST_ALL_REGEX}" | \
+		awk -F'[/ ]' '{print $4}' |
+		sort
+}
+
+function get_upstream_plugins_wmf() {
+	# Exclude nested repositories for directory layout sanity
+	# shellcheck disable=SC2016
+	get_upstream_url_contents_cached "${EXTLIST_WMF_URL}" | \
+		grep -P "${EXTLIST_WMF_REGEX}" | \
+		awk -F/ '{print $3}' | \
+		sort -u
+}
+
+function get_upstream_plugins_nonwmf() {
+	comm -23 \
+		<(get_upstream_plugins_all) \
+		<(get_upstream_plugins_wmf)
+}
+
+if [ "$CATEGORY" == "all" ]; then
+	get_upstream_plugins_all
+elif [ "$CATEGORY" == "wmf" ]; then
+	get_upstream_plugins_wmf
+elif [ "$CATEGORY" == "nonwmf" ]; then
+	get_upstream_plugins_nonwmf
+else
+	print_usage
+	exit 1
+fi
