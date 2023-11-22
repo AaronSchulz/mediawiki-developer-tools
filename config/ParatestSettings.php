@@ -40,8 +40,6 @@ function mwptInitSchemaClone( string $liveDbPath, string $cloneDbPath ) {
 
 	flock( $fh, LOCK_UN );
 	fclose( $fh );
-    
-    if ( headers_sent() ) moo();
 }
 
 function mwptSqliteHandle( $filename ) {
@@ -58,6 +56,7 @@ function mwptModifyDirectories() {
     global $wgDBservers, $wgDBtype, $wgDBserver, $wgDBname, $wgDBuser, $wgDBpassword;
     global $wgLocalisationCacheConf;
     global $wgDirectoryMode;
+    global $wgDebugLogFile;
 
 	$envTmpDir = getenv( 'TMPDIR' );
 	$envTestToken = getenv( 'TEST_TOKEN' );
@@ -71,6 +70,8 @@ function mwptModifyDirectories() {
     $wgTmpDirectory = "${envTmpDir}/${envTestToken}";
     // Make slot directory
     @mkdir( $wgTmpDirectory, $wgDirectoryMode );
+    // Set logger directory for unit tests
+    $wgDebugLogFile = "$wgTmpDirectory/mw-debug-cli.log";
 
     // Normalize $wgDBservers if not set
     if ( $wgDBtype === 'sqlite' && !is_array( $wgDBservers ) ) {
