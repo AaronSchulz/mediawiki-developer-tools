@@ -76,7 +76,7 @@ function prepare_mw_paratest_phpunit_config_file() {
     local OUTPUT_BASE_PATH=""
     cd "${MW_CORE_DIR}/tests/phpunit"
 
-    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/phpunit.xml.dist")"
+    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/tests/phpunit/suite.xml")"
     if [[ "$(dirname "${FILE_RELPATH}")" == "." ]]; then
       OUTPUT_BASE_PATH="tests/phpunit/"
     fi
@@ -265,9 +265,9 @@ function execute_mw_paratest() {
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
         php "${HOME}/bin/paratest" \
-        --phpunit="tests/phpunit/phpunit.php" \
+        --phpunit="${MW_CORE_DIR}/vendor/bin/phpunit" \
         --configuration="tests/phpunit/mwp_suite.xml" \
-        --bootstrap="${BASE_DIR}/config/dummy.php" \
+        --bootstrap="${MW_CORE_DIR}/tests/phpunit/bootstrap.integration.php" \
         --tmp-dir="${MW_TMPDIR}" \
         --processes="${PROCESSES}" \
         --runner="Runner" \
