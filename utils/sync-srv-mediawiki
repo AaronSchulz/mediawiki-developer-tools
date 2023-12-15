@@ -95,6 +95,10 @@ function sync_project_code() {
 				git clean -xfd \
 					--exclude='vendor/**' --exclude='node_modules/**' --exclude='*Settings.php' \
 					1>/dev/null || exit 1
+				# Update any submodules
+				git submodule foreach --recursive git reset --hard || exit 1
+				# Clean excess submodule files
+				git submodule foreach --recursive git clean -xfd || exit 1
 			fi
 		) || exit 1
 

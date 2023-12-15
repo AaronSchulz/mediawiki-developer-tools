@@ -109,7 +109,7 @@ function repo_clone_checkout_master() {
 		cd "./${REPO}"
 		git config core.filemode false
 		git checkout master -qf
-		git submodule update --recursive --remote
+		git submodule update --init --recursive --remote
 	)
 }
 
