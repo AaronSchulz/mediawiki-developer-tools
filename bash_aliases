@@ -32,6 +32,7 @@ alias gsyncprod='~/bin/git remote update&& [[ "$(~/bin/git branch --show-current
 alias gadd='~/bin/git add --interactive'
 alias gcommit='~/bin/git add --interactive && git commit'
 alias gamend='~/bin/git commit -a --amend'
+alias greflog='~/bin/git reflog --pretty=short --date=iso'
 
 # git-review
 alias grpush='~/bin/git-review -fR'
