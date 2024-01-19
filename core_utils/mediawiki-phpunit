@@ -201,22 +201,12 @@ function execute_mw_phpunit() {
 		  echo "Environmental variables: ${PRESERVE_ENV}"
 		fi
 
-		if [ -x "${MW_CORE_DIR}/vendor/bin/phpunit" ]; then
-			exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-				env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" MW_LOG_DIR="${MW_LOGDIR}" \
-				php "${PHP_ARGS[@]}" "${MW_CORE_DIR}/vendor/bin/phpunit" \
-				-c "tests/phpunit/suite.xml" \
-				--cache-result-file="${PHPUNIT_CACHE_FILE}" \
-				--colors=always \
-				"${PHPUNIT_ARGS[@]}" 2>&1
-		else
-			exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
-				env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" MW_LOG_DIR="${MW_LOGDIR}" \
-				php "${PHP_ARGS[@]}" "${MW_CORE_DIR}/tests/phpunit/phpunit.php" \
-				--cache-result-file="${PHPUNIT_CACHE_FILE}" \
-				--colors=always \
-				"${PHPUNIT_ARGS[@]}" 2>&1
-		fi
+    exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
+      env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" MW_LOG_DIR="${MW_LOGDIR}" \
+      php "${PHP_ARGS[@]}" "${MW_CORE_DIR}/vendor/bin/phpunit" \
+      --cache-result-file="${PHPUNIT_CACHE_FILE}" \
+      --colors=always \
+      "${PHPUNIT_ARGS[@]}" 2>&1
 	)
 }
 
