@@ -76,3 +76,10 @@ function notepadpp {
 	WSLPATH=$(wslpath -w "$1")
 	/mnt/c/Program\ Files\ \(x86\)/Notepad++/notepad++.exe "$WSLPATH"
 }
+
+# Convenience wrappers for docker
+alias mwd-up='docker compose up -d'
+alias mwd-down='docker compose down'
+alias mwd-reset='docker compose down && docker compose up -d'
+alias mwd-script='docker compose exec mediawiki php core/maintenance/run'
+alias mwd-bash='docker compose exec mediawiki bash'
