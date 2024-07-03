@@ -60,8 +60,7 @@ function mwptModifyDirectories() {
 
 	$envTmpDir = getenv( 'TMPDIR' );
 	$envTestToken = getenv( 'TEST_TOKEN' );
-	$envTestRunNo = getenv( 'TEST_RUN_NO' );
-	if ( in_array( false, [ $envTmpDir, $envTestToken, $envTestRunNo ], true ) ) {
+	if ( in_array( false, [ $envTmpDir, $envTestToken ], true ) ) {
 		// Not an invocation from paratest runner
 		return;
 	}
@@ -119,4 +118,6 @@ function mwptModifyDirectories() {
 	$wgSQLiteDataDir = $wgTmpDirectory;
 }
 
-mwptModifyDirectories();
+if ( PHP_SAPI === 'cli' ) {
+	mwptModifyDirectories();
+}
