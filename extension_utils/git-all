@@ -59,7 +59,7 @@ function repo_init_update_remote() {
 		git init -q
 		git config core.filemode false
 		git remote add origin "${GERRIT_URL_SSH}/${GERRIT_EXT_DIR}${REPO}"
-		git remote update >/dev/null
+		git remote update origin >/dev/null
 		git checkout master -fq
 		git submodule update --recursive --remote
 	)
@@ -166,7 +166,7 @@ function cmd_push_and_reset_origin_master() {
 		cd "./${REPO}"
 		CHANGES=$(git log --oneline origin/master..HEAD)
 		if [ -n "${CHANGES}" ]; then
-			timeout 60 git remote update
+			timeout 60 git remote update origin
 			timeout 60 git push -f
 			git reset --hard origin/master
 		fi
@@ -186,7 +186,7 @@ function cmd_review_and_reset_origin_master() {
 		cd "./${REPO}"
 		CHANGES=$(git log --oneline origin/master..HEAD | wc -l)
 		if [ "${CHANGES}" -eq 1 ]; then
-			timeout 60 git remote update
+			timeout 60 git remote update origin
 			timeout 60 git-review
 			git reset --hard origin/master
 		elif [ "${CHANGES}" -gt 1 ]; then
