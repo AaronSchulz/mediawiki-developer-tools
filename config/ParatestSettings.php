@@ -66,7 +66,7 @@ function mwptModifyDirectories() {
 	}
 
 	// Use the temp dir for the slot assigned by paratest
-	$wgTmpDirectory = "${envTmpDir}/${envTestToken}";
+	$wgTmpDirectory = "$envTmpDir/$envTestToken";
 	// Make slot directory
 	@mkdir( $wgTmpDirectory, $wgDirectoryMode );
 	// Set logger directory for unit tests
