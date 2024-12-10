@@ -23,7 +23,7 @@ function mwptInitSchemaClone( string $liveDbPath, string $cloneDbPath ) {
 		$dbc = mwptSqliteHandle( $cloneDbPath );
 
 		$sqls = $dbl->selectFieldValues(
-			$dbl->addIdentifierQuotes( 'sqlite_master' ),
+			'sqlite_master',
 			'sql',
 			[
 				'type' => [ 'index', 'table' ],
