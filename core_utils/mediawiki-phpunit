@@ -173,7 +173,7 @@ function sync_srv_mediawiki() {
 
 function get_preserved_variables() {
   # Preserve environmental variables used to select test backends
-  printenv | grep -Po '(MW_INSTALL_PATH|MW_DB|PHPUNIT_[^=]+|XDEBUG_SESSION)' | sed ':a;N;$!ba;s/\n/,/g'
+  printenv | grep -Po '(MW_INSTALL_PATH|MW_DB|PHPUNIT_[^=]+|XDEBUG_[^=]+)' | sed ':a;N;$!ba;s/\n/,/g'
 }
 
 function max_files_per_subsuite() {
