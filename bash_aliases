@@ -1,3 +1,4 @@
+#!/bin/bash
 # YubiKey
 export OPENSC='/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so'
 function yubiadd() {
@@ -43,9 +44,9 @@ alias grdownload='~/bin/git-review -d $1'
 # git/svn convenience
 alias grep='grep --exclude-dir=".git" --exclude-dir=".svn"'
 
-# git-based convenience
-alias gphpcs='~/bin/git log origin..HEAD -p --name-only --format= --diff-filter=d | xargs -d "\n" vendor/bin/phpcs -s'
-alias gphan='FLIST=$(~/bin/git log origin..HEAD -p --name-only --format= --diff-filter=d | sed -z "s/\n/,/g;s/,$/\n/"); if [ -n "$FLIST" ]; then vendor/bin/phan -I "$FLIST" -j8; fi'
+# git-based convenience (check for errors on local changes)
+alias gphpcs='mapfile -t FLIST < <(~/bin/git log origin..HEAD -p --name-only --format= --diff-filter=d); if [ -n "${FLIST}" ]; then vendor/bin/phpcs -s -p --parallel=8 "${FLIST[@]}"; fi'
+alias gphan='FLIST=$(~/bin/git log origin..HEAD -p --name-only --format= --diff-filter=d | sed -z "s/\n/,/g;s/,$/\n/"); if [ -n "${FLIST}" ]; then vendor/bin/phan -I "${FLIST}" -j8; fi'
 
 # Convenience launcher for code quality
 alias vphpcs='if [ ! -x vendor/bin/phpcs ]; then composer update; fi; vendor/bin/phpcs -p -s'
