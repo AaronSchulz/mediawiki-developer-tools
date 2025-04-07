@@ -3,6 +3,9 @@
 BASE_DIR=$(dirname $(realpath $0))
 DIRECTORY=$(basename "$(pwd -P)")
 
+BC_BLUE="\e[1;34m"
+BC_END="\e[0m"
+
 if [ "$DIRECTORY" != "extensions" ]; then
 	echo "This script only runs in the 'extensions' directory" >&2
 	exit 127
@@ -16,5 +19,5 @@ mapfile -t REPO_NAMES_MATCH < <(
 )
 for REPO_NAME in "${REPO_NAMES_MATCH[@]}"; do
 	OUT=$(grep -r --exclude-dir=".git" --color=always -hn "$@" "$REPO_NAME")
-	[ -z "$OUT" ] || echo -e "$REPO_NAME:\n$OUT"
+	[ -z "$OUT" ] || echo -e "${BC_BLUE}${REPO_NAME}${BC_END}:\n${OUT}"
 done

@@ -10,6 +10,10 @@ DIRECTORY=$(basename "$(pwd -P)")
 OPERATION=$1
 SUMMARY=$2
 
+BC_MAGENTA="\e[1;35m"
+BC_BLUE="\e[1;34m"
+BC_END="\e[0m"
+
 if [ "$DIRECTORY" == "extensions" ]; then
   GERRIT_EXT_DIR="mediawiki/extensions/"
   EXTLIST_ALL_URL="${GERRIT_URL_HTTPS}/r/projects/?format=text&b=master&p=mediawiki%2Fextensions%2F"
@@ -28,59 +32,7 @@ else
 fi
 
 function print_usage() {
-	echo "Usage: ${SCRIPT_BASENAME} <sync|commit|push|reset|review|update|gc> [message]"
-}
-
-function cmd_update_remote() {
-	local REPO=$1
-	local REMOTE_ORIGIN_SHA1=$2
-
-	if [ ! -d "./${REPO}/.git" ]; then
-		repo_init_update_remote "${REPO}" "${REMOTE_ORIGIN_SHA1}"
-	else
-		repo_update_remote "${REPO}" "${REMOTE_ORIGIN_SHA1}"
-	fi
-}
-
-function repo_init_update_remote() {
-	local REPO=$1
-	local REMOTE_ORIGIN_SHA1=$2
-	(
-		set -e
-		local BYPASSED
-
-		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
-		[[ "${BYPASSED}" -ne 1 ]] || exit 0
-
-		echo "Initializing ${REPO}"
-
-		mkdir -p "${REPO}"
-		cd "./${REPO}"
-		git init -q
-		git config core.filemode false
-		git remote add origin "${GERRIT_URL_SSH}/${GERRIT_EXT_DIR}${REPO}"
-		git remote update origin >/dev/null
-		git checkout master -fq
-		git submodule update --recursive --remote
-	)
-}
-
-function repo_update_remote() {
-	local REPO=$1
-	local REMOTE_ORIGIN_SHA1=$2
-	(
-		set -e
-		local INDEX_SYNCED SALTED
-
-		ORIGIN_SYNCED=$(local_origin_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		[[ "${ORIGIN_SYNCED}" -ne 1 ]] || exit 0
-
-		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
-
-		mkdir -p "${REPO}"
-		cd "./${REPO}"
-		timeout 120 git remote update origin >/dev/null
-	)
+	echo "Usage: ${SCRIPT_BASENAME} <sync|update|uncommitted|commit|unpushed|push-direct|push-review|reset|review|gc> [message]"
 }
 
 function cmd_sync_origin_master() {
@@ -88,52 +40,46 @@ function cmd_sync_origin_master() {
 	local REMOTE_ORIGIN_SHA1=$2
 
 	if [ ! -d "./${REPO}" ]; then
-		repo_clone_checkout_master "${REPO}" "${REMOTE_ORIGIN_SHA1}"
+		repo_clone_and_checkout_master "${REPO}" "${REMOTE_ORIGIN_SHA1}"
 	else
-		repo_update_reset_origin_master "${REPO}" "${REMOTE_ORIGIN_SHA1}"
+		repo_update_origin_and_reset_origin_master "${REPO}" "${REMOTE_ORIGIN_SHA1}"
 	fi
 }
 
-function repo_clone_checkout_master() {
+function cmd_update_origin() {
+	local REPO=$1
+	local REMOTE_ORIGIN_SHA1=$2
+
+	if [ ! -d "./${REPO}/.git" ]; then
+		repo_clone_and_checkout_master "${REPO}" "${REMOTE_ORIGIN_SHA1}"
+	else
+		repo_update_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}"
+	fi
+}
+
+function cmd_untracked() {
 	local REPO=$1
 	local REMOTE_ORIGIN_SHA1=$2
 	(
 		set -e
-		local BYPASSED
-
-		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
-		[[ "${BYPASSED}" -ne 1 ]] || exit 0
-
-		git clone "${GERRIT_URL_SSH}/${GERRIT_EXT_DIR}${REPO}"
+		local CHANGES
 
 		cd "./${REPO}"
-		git config core.filemode false
-		git checkout master -qf
-		git submodule update --init --recursive --remote
+		CHANGES=$(git ls-files -z -o --exclude-standard)
+		[ -z "${CHANGES}" ] || printf "%s" "${CHANGES}"
 	)
 }
 
-function repo_update_reset_origin_master() {
+function cmd_uncommitted() {
 	local REPO=$1
 	local REMOTE_ORIGIN_SHA1=$2
 	(
 		set -e
-		local ORIGIN_SYNCED INDEX_SYNCED SALTED CHANGES
-
-		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
-
-		ORIGIN_SYNCED=$(local_origin_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
-
-		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
+		local CHANGES
 
 		cd "./${REPO}"
-		CHANGES=$(git status -s --ignore-submodules --untracked-files=no | wc -l)
-		[ "$CHANGES" -ge 0 ] || git stash
-		[[ "${ORIGIN_SYNCED}" -eq 1 ]] || timeout 60 git remote update origin >/dev/null
-		git checkout master -qf
-		git reset --hard origin/master
-		timeout 60 git submodule update --init
+		CHANGES=$(git diff -U3 --ignore-submodules HEAD)
+		[ -z "${CHANGES}" ] || printf "%s" "${CHANGES}"
 	)
 }
 
@@ -147,9 +93,20 @@ function cmd_commit() {
 
 		cd "./${REPO}"
 		CHANGES=$(git status -s --ignore-submodules --untracked-files=no)
-		if [ -n "${CHANGES}" ]; then
-			git commit -a -m "${SUMMARY}"
-		fi
+		[ -z "${CHANGES}" ] || git commit -a -m "${SUMMARY}"
+	)
+}
+
+function cmd_log_upstream_to_head() {
+	local REPO=$1
+	local REMOTE_ORIGIN_SHA1=$2
+	(
+		set -e
+		local CHANGES
+
+		cd "./${REPO}"
+		CHANGES=$(git log --name-status --shortstat '@{upstream}..HEAD')
+		[ -z "${CHANGES}" ] || printf "%s" "${CHANGES}"
 	)
 }
 
@@ -160,15 +117,17 @@ function cmd_push_and_reset_origin_master() {
 		set -e
 		local INDEX_SYNCED CHANGES
 
-		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+		INDEX_SYNCED=$(repo_head_matches_remote_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
 
 		cd "./${REPO}"
 		CHANGES=$(git log --oneline origin/master..HEAD)
-		if [ -n "${CHANGES}" ]; then
+		if [ "${CHANGES}" -eq 1 ]; then
 			timeout 60 git remote update origin
 			timeout 60 git push -f
 			git reset --hard origin/master
+		elif [ "${CHANGES}" -gt 1 ]; then
+      echo "Repo ${REPO} has multiple commits...skipping" >&2
 		fi
 	)
 }
@@ -180,7 +139,7 @@ function cmd_review_and_reset_origin_master() {
 		set -e
 		local INDEX_SYNCED CHANGES
 
-		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+		INDEX_SYNCED=$(repo_head_matches_remote_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
 
 		cd "./${REPO}"
@@ -206,18 +165,18 @@ function cmd_reset_origin_master() {
 		[[ "${SALTED}" -ne 1 ]] || exit 0
 
 		# Note that REMOTE_ORIGIN_SHA1 might be higher than what is known in .git
-		INDEX_SYNCED=$(head_matches_upstream_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+		INDEX_SYNCED=$(repo_head_matches_remote_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
 		if [[ "${INDEX_SYNCED}" -ne 1 ]]; then
 			# Check if the repo is in working condition
 			echo -n "Checking integrity of ${REPO}..."
-			VALID_GIT_REPO=$(check_git_repo_is_valid "${REPO}")
+			VALID_GIT_REPO=$(repo_is_valid "${REPO}")
 			echo "done"
 			# Rebuild the entire Git repo if it got hosed somehow
 			if [ -z "$VALID_GIT_REPO" ]; then
 				echo -n "Repo ${REPO} is corrupt; removing..."
 				rm -rf "./${REPO}/.git"
 				echo 'done'
-				repo_init_update_remote "${REPO}" "${REMOTE_ORIGIN_SHA1}"
+				repo_init_and_update_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}"
 				exit 0
 			fi
 		fi
@@ -248,7 +207,68 @@ function cmd_gc() {
 	)
 }
 
-function check_git_repo_is_valid() {
+function repo_update_origin() {
+	local REPO=$1
+	local REMOTE_ORIGIN_SHA1=$2
+	(
+		set -e
+		local INDEX_SYNCED SALTED
+
+		ORIGIN_SYNCED=$(repo_origin_matches_remote_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+		[[ "${ORIGIN_SYNCED}" -ne 1 ]] || exit 0
+
+		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
+
+		mkdir -p "${REPO}"
+		cd "./${REPO}"
+		timeout 120 git remote update origin >/dev/null
+	)
+}
+
+function repo_clone_and_checkout_master() {
+	local REPO=$1
+	local REMOTE_ORIGIN_SHA1=$2
+	(
+		set -e
+		local BYPASSED
+
+		BYPASSED=$(repo_bypass_creation_if_archived "${REPO}")
+		[[ "${BYPASSED}" -ne 1 ]] || exit 0
+
+		git clone "${GERRIT_URL_SSH}/${GERRIT_EXT_DIR}${REPO}"
+
+		cd "./${REPO}"
+		git config core.filemode false
+		git checkout master -qf
+		git submodule update --init --recursive --remote
+	)
+}
+
+function repo_update_origin_and_reset_origin_master() {
+	local REPO=$1
+	local REMOTE_ORIGIN_SHA1=$2
+	(
+		set -e
+		local ORIGIN_SYNCED INDEX_SYNCED SALTED CHANGES
+
+		INDEX_SYNCED=$(repo_head_matches_remote_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+		[[ "${INDEX_SYNCED}" -ne 1 ]] || exit 0
+
+		ORIGIN_SYNCED=$(repo_origin_matches_remote_origin "${REPO}" "${REMOTE_ORIGIN_SHA1}")
+
+		echo "Updating ${REPO} to include ${REMOTE_ORIGIN_SHA1:0:7}"
+
+		cd "./${REPO}"
+		CHANGES=$(git status -s --ignore-submodules --untracked-files=no | wc -l)
+		[ "$CHANGES" -ge 0 ] || git stash
+		[[ "${ORIGIN_SYNCED}" -eq 1 ]] || timeout 60 git remote update origin >/dev/null
+		git checkout master -qf
+		git reset --hard origin/master
+		timeout 60 git submodule update --init
+	)
+}
+
+function repo_is_valid() {
 	local REPO=$1
 	(
 		set +e
@@ -261,7 +281,7 @@ function check_git_repo_is_valid() {
 	exit 0
 }
 
-function local_origin_matches_upstream_origin() {
+function repo_origin_matches_remote_origin() {
 	local REPO=$1
 	local REMOTE_ORIGIN_SHA1=$2
 	local LOCAL_ORIGIN_MASTER_HEAD_SHA1_FILE="${REPO}/.git/refs/remotes/origin/master"
@@ -298,7 +318,7 @@ function local_origin_matches_upstream_origin() {
 	exit 0
 }
 
-function head_matches_upstream_origin() {
+function repo_head_matches_remote_origin() {
 	local REPO=$1
 	local REMOTE_ORIGIN_SHA1=$2
 	local LOCAL_HEAD_FILE="${REPO}/.git/HEAD"
@@ -441,18 +461,27 @@ function git_command_all() {
 	declare COMMAND
 	case $OPERATION in
 	"update")
-		COMMAND='cmd_update_remote'
+		COMMAND='cmd_update_origin'
 		;;
 	"sync")
 		COMMAND='cmd_sync_origin_master'
 		;;
+	"untracked")
+		COMMAND='cmd_untracked'
+		;;
+	"uncommitted")
+		COMMAND='cmd_uncommitted'
+		;;
 	"commit")
 		COMMAND='cmd_commit'
 		;;
-	"push")
+	"unpushed")
+		COMMAND='cmd_log_upstream_to_head'
+		;;
+	"push-direct")
 		COMMAND='cmd_push_and_reset_origin_master'
 		;;
-	"review")
+	"push-review")
 		COMMAND='cmd_review_and_reset_origin_master'
 		;;
 	"reset")
@@ -483,11 +512,12 @@ function git_command_all() {
 			declare OUT
 			OUT=$($COMMAND "${REPO}" "${REMOTE_ORIGIN_SHA1}" "${SUMMARY}" 2>&1)
 			declare -i CODE=$?
-
 			if [ $CODE -ne 0 ]; then
-				echo -e "[${REPO}] (upstream: ${REMOTE_ORIGIN_SHA1:0:7}) FAILED:\n${OUT}"
+				echo -e "${BC_MAGENTA}[${REPO}] (upstream: ${REMOTE_ORIGIN_SHA1:0:7}) FAILED:${BC_END}"
+				echo "${OUT}"
 			elif [ -n "${OUT}" ]; then
-				echo -e "[${REPO}] (upstream: ${REMOTE_ORIGIN_SHA1:0:7}) OK:\n${OUT}"
+				echo -e "${BC_BLUE}[${REPO}] (upstream: ${REMOTE_ORIGIN_SHA1:0:7}) OK:${BC_END}"
+				echo "${OUT}"
 			fi
 
 			exit $CODE

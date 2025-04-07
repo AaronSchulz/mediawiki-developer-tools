@@ -87,8 +87,20 @@ ln -s /path/to/mediawiki-developer-tools/extension_utils/* .
 ### Syncing/pushing git repos ###
 Some git/git-review utilities are included for doing mass operations.
 
-* git-all: use this to clone, pull, or git-review the master branch of all gerrit-hosted extensions into the current folder
-* git-wmf: use this to clone, pull, or git-review the master branch of all Wikimedia deployed, gerrit-hosted, extensions into the current folder 
+* git-all: use this to perform an action on all Gerrit-hosted extensions/skins for the current folder
+* git-wmf: use this to perform an action on all Wikimedia deployed, Gerrit-hosted, extensions/skins for current folder 
+
+The mass repo actions include:
+* sync: clone if nonexistant, stash any changes, update origin, hard reset to origin/master, 
+  and recursively update/init submodules
+* update: clone and recursively update/init submodules if nonexistant, and update origin
+* uncommitted: show diff bewteen upstream and the working tree (includes staged changes)
+* commit: commit all changed files (tracked) and staged files (preferably added via the IDE)
+* unpushed: show all commits after upstream
+* push-direct: push the changes to the remote and hard reset to master
+* push-review: push the changes for Gerrit review and hard reset to master
+* reset: hard reset to master
+* gc: garbage collect
 
 Note:
 At least when using Windows, it's best to set SSH connection keep-alive to avoid TCP connection spam in TIME_WAIT that can lead to exhaustion. E.g.:
