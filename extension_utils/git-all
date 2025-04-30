@@ -422,7 +422,6 @@ function git_command_all() {
 	fi
 
 	declare -A REMOTE_SHA1_BY_REPO
-	echo -n "Enumerating plugin repos under '${GERRIT_EXT_DIR}'..."
 	# shellcheck disable=SC2162
 	while IFS='|' read -r sha1 name; do
 		#echo "Found upstream repo '$name'"
@@ -432,13 +431,14 @@ function git_command_all() {
 		fi
 		REMOTE_SHA1_BY_REPO[$name]="$sha1"
 	done <<<"$(get_upstream_plugins_all)"
-	echo "done"
+	if [[ ${#REMOTE_SHA1_BY_REPO[@]} == 0 ]]; then
+		echo "Failed to enumerate plugin repos under '${GERRIT_EXT_DIR}'..."
+	fi
 
 	# Figure out which repos this command will actually affect
 	declare -A REMOTE_SHA1_BY_TARGET_REPO
 	if [ -n "${GIT_ALL_WMF_ONLY}" ]; then
 		declare -a WMF_DEPLOYED_REPOS
-		echo -n "Enumerating WMF-deployed plugin repos under '${GERRIT_EXT_DIR}'..."
 		mapfile -t WMF_DEPLOYED_REPOS < <(get_upstream_plugins_wmf)
 		for name in "${WMF_DEPLOYED_REPOS[@]}"; do
 			if [[ ! -v REMOTE_SHA1_BY_REPO[$name] ]]; then
@@ -451,7 +451,9 @@ function git_command_all() {
 			#echo "Using repo '$name'"
 			REMOTE_SHA1_BY_TARGET_REPO[$name]=${REMOTE_SHA1_BY_REPO[$name]}
 		done
-		echo "done"
+		if [[ ${#REMOTE_SHA1_BY_TARGET_REPO[@]} == 0 ]]; then
+    		echo "Failed to enumerate WMF-deployed plugin repos under '${GERRIT_EXT_DIR}'..."
+    	fi
 	else
 		for name in "${!REMOTE_SHA1_BY_REPO[@]}"; do
 			REMOTE_SHA1_BY_TARGET_REPO[$name]=${REMOTE_SHA1_BY_REPO[$name]}

@@ -1,9 +1,32 @@
 #!/bin/bash
 
-(cd core && git diff --exit-code --stat && git remote update && git reset --hard origin/master && composer.phar update)
+BC_MAGENTA="\e[1;35m"
+BC_BLUE="\e[1;34m"
+BC_BROWN="\e[1;33m"
+BC_END="\e[0m"
+
+declare OUT
+OUT=$(
+	cd core 2>&1 &&
+	git diff --exit-code --stat 2>&1 &&
+	git remote update 2>&1 &&
+	git reset -q --hard origin/master 2>&1
+)
+declare -i CODE=$?
+if [ $CODE -ne 0 ]; then
+	echo -e "${BC_MAGENTA}[core] FAILED:${BC_END}"
+	echo "${OUT}"
+elif [ -n "${OUT}" ]; then
+	echo -e "${BC_BLUE}[core] OK:${BC_END}"
+	echo "${OUT}"
+fi
 
 (cd skins && ./git-all sync)
 
 (cd extensions && ./git-all sync)
 
+echo -e "${BC_BROWN}Composer update:${BC_END}"
+(cd core && composer.phar update 2>&1)
+
+echo -e "${BC_BROWN}RDBMS schema update:${BC_END}"
 (cd core && sudo -u www-data php maintenance/run update --quick)

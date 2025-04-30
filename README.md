@@ -71,16 +71,18 @@ composer.phar update
 ln -s $(realpath ./bin/paratest) ~/bin/paratest
 </code>
 
-## Mediawiki extension utilities ##
+## Mediawiki extension/skin utilities ##
 A set of programs that can be run from either an "extensions" directory containing MediaWiki
-extension repos, or, a "skins" containing MediaWiki skin repos. These directories should not be 
-the same directories as the ones that appears under the "core" repo. The proper place for these
-directories is under the "mediawiki" directory.
+extension repos, or, a "skins" directory containing MediaWiki skin repos. These directories 
+should not be the same directories as the ones that appears under the "core" repo. The proper 
+place for these directories is under the "mediawiki" directory.
 
 These programs can be enabled by creating symlinks within this extension folder, e.g.:
 
 <code>
 cd /path/to/mediawiki/extensions
+ln -s /path/to/mediawiki-developer-tools/extension_utils/* .
+cd /path/to/mediawiki/skins
 ln -s /path/to/mediawiki-developer-tools/extension_utils/* .
 </code>
 
