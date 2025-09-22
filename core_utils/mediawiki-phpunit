@@ -45,7 +45,7 @@ function clean_mw_temp_dir() {
 	echo "done"
 
 	echo -n "Clearing orphaned files in '${TMPDIR_MOUNT}'..."
-	find "${TMPDIR_MOUNT}" -name "${TMP_SUBDIR_PREFIX}.*" -type f -mmin +60 -delete
+	find "${TMPDIR_MOUNT}" -maxdepth 1 -name "${TMP_SUBDIR_PREFIX}.*" -type f -mmin +60 -delete
 	echo "done"
 }
 
