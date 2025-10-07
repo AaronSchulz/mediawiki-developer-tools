@@ -2,10 +2,10 @@
 # YubiKey
 export OPENSC='/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so'
 function yubiadd() {
-	ssh-add -s $OPENSC
+	ssh-add -t 36000 -s $OPENSC
 }
 function yubidel() {
-	ssh-add -e $OPENSC
+	ssh-add -t 36000 -e $OPENSC
 }
 function yubireset() {
 	yubidel
