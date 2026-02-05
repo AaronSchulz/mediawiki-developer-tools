@@ -51,7 +51,6 @@ function clean_mw_temp_dir() {
 
 function prepare_mw_paratest_phpunit_config() {
   prepare_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml.dist"
-  prepare_mw_paratest_phpunit_config_file "$1" "tests/phpunit/mwp_suite.xml"
 }
 
 function prepare_mw_paratest_phpunit_config_file() {
@@ -76,7 +75,7 @@ function prepare_mw_paratest_phpunit_config_file() {
     local OUTPUT_BASE_PATH=""
     cd "${MW_CORE_DIR}/tests/phpunit"
 
-    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/tests/phpunit/suite.xml")"
+    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/phpunit.xml.dist")"
     if [[ "$(dirname "${FILE_RELPATH}")" == "." ]]; then
       OUTPUT_BASE_PATH="tests/phpunit/"
     fi
@@ -153,7 +152,6 @@ function prepare_mw_paratest_phpunit_config_file() {
 
 function clean_mw_paratest_phpunit_config() {
   clean_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml.dist"
-  clean_mw_paratest_phpunit_config_file "$1" "tests/phpunit/mwp_suite.xml"
 }
 
 function clean_mw_paratest_phpunit_config_file() {
@@ -203,7 +201,7 @@ function execute_mw_phpunit() {
 
     exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
       env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" MW_LOG_DIR="${MW_LOGDIR}" \
-      php "${PHP_ARGS[@]}" "${MW_CORE_DIR}/vendor/bin/phpunit" \
+      php "${MW_CORE_DIR}/vendor/bin/phpunit" \
       --cache-result-file="${PHPUNIT_CACHE_FILE}" \
       --colors=always \
       "${PHPUNIT_ARGS[@]}" 2>&1
@@ -217,6 +215,7 @@ function execute_mw_paratest() {
 	local PRESERVE_ENV=""
 	local MW_TMPDIR="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
 	local PROCESSES=$((1 * $(nproc --all)))
+	local PHPUNIT_PASS_ARG="${PHPUNIT_ARGS[*]}"
 
 	(
 		set -e
@@ -233,6 +232,7 @@ function execute_mw_paratest() {
 		if [ -n "${PRESERVE_ENV}" ]; then
 		  echo "Environmental variables detected: ${PRESERVE_ENV}"
 		fi
+set -x
 
     if [ -x "${MW_CORE_DIR}/vendor/bin/paratest" ]; then
       exec sudo -u www-data -H \
@@ -245,8 +245,7 @@ function execute_mw_paratest() {
         --runner="Runner" \
         --parallel-suite \
         --colors="always" \
-        --passthru-php="${PHP_ARGS[*]}" \
-        --passthru="${PHPUNIT_ARGS[*]}"
+        --passthru \""${PHPUNIT_PASS_ARG}\""
     elif [ -x "${HOME}/bin/paratest" ]; then
       # XXX: use the custom phpunit.php for proper bootstrapping and handling of --conf.
       # Since this already takes care of bootstrapping via MediaWikiPHPUnitCommand, give
@@ -255,16 +254,15 @@ function execute_mw_paratest() {
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
         php "${HOME}/bin/paratest" \
-        --phpunit="${MW_CORE_DIR}/vendor/bin/phpunit" \
-        --configuration="tests/phpunit/mwp_suite.xml" \
-        --bootstrap="${MW_CORE_DIR}/tests/phpunit/bootstrap.integration.php" \
-        --tmp-dir="${MW_TMPDIR}" \
-        --processes="${PROCESSES}" \
-        --runner="Runner" \
+        --phpunit "${MW_CORE_DIR}/vendor/bin/phpunit" \
+        --configuration="mwp_phpunit.xml.dist" \
+        --bootstrap="${MW_CORE_DIR}/tests/phpunit/bootstrap.php" \
+        --tmp-dir "${MW_TMPDIR}" \
+        --processes "${PROCESSES}" \
+        --runner "Runner" \
         --parallel-suite \
         --colors \
-        --passthru-php="${PHP_ARGS[*]}" \
-        --passthru="${PHPUNIT_ARGS[*]}" \
+        --passthru \""${PHPUNIT_PASS_ARG}\""
         --verbose="$(($VERBOSE))"
     else
       echo "Could not find paratest at '${PARATEST_BIN}'"
@@ -287,7 +285,6 @@ else
 fi
 declare PHPUNIT_CACHE_FILE="${TMPDIR_MOUNT}/mw-phpunit-cache.${COMMAND}"
 
-declare -a PHP_ARGS
 # Optimize execution via OPCache (see opcache-cli.ini)
 if [ -d /opcache/php ]; then
 	echo "Detected shared OPCache directory: /opcache/php"
