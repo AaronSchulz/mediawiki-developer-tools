@@ -232,7 +232,6 @@ function execute_mw_paratest() {
 		if [ -n "${PRESERVE_ENV}" ]; then
 		  echo "Environmental variables detected: ${PRESERVE_ENV}"
 		fi
-set -x
 
     if [ -x "${MW_CORE_DIR}/vendor/bin/paratest" ]; then
       exec sudo -u www-data -H \
