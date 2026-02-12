@@ -80,7 +80,8 @@ function mwptModifyDirectories() {
 			'user' => $wgDBuser,
 			'password' => $wgDBpassword,
 			'dbDirectory' => $wgSQLiteDataDir,
-			'type' => $wgDBtype
+			'type' => $wgDBtype,
+			'load' => 100
 		] ];
 	}
 	// Make $wgDBservers use the assigned temp dir where applicable
