@@ -45,6 +45,9 @@ alias grdownload='~/bin/git-review -d $1'
 # git/svn convenience
 alias grep='grep --exclude-dir=".git" --exclude-dir=".svn"'
 
+# WMF SSH fingerprints (https://wikitech.wikimedia.org/wiki/Help:SSH_Fingerprints)
+alias update-wmf-fingerprints='curl "https://config-master.wikimedia.org/known_hosts" -o ~/.ssh/known_hosts'
+
 # git-based convenience (check for errors on local changes)
 alias gphpcs='mapfile -t FLIST < <(~/bin/git log origin..HEAD -p --name-only --format= --diff-filter=d); if [ -n "${FLIST}" ]; then vendor/bin/phpcs -s -p --parallel=8 "${FLIST[@]}"; fi'
 alias gphan='FLIST=$(~/bin/git log origin..HEAD -p --name-only --format= --diff-filter=d | sed -z "s/\n/,/g;s/,$/\n/"); if [ -n "${FLIST}" ]; then vendor/bin/phan -I "${FLIST}" -j8; fi'
