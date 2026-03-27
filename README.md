@@ -121,6 +121,25 @@ Note that GitHub SSH URLs require the username "git", so be careful when setting
 git config core.sshCommand = "plink.exe -ssh -l YOUR_SSH_USERNAME -share -agent"
 </code>
 
+### MediaWiki-Docker considerations ###
+MediaWiki-Docker currently assumes that extensions are checked out under the extensions/ subdirectory of the mediawiki core directory rather than a sibling extensions/ directory. Likewise for skins and the skins/ directory. Making it work this way requires a few extra things.
+
+In order for docker to work, it needs to be launched from the `mediawiki` directory, so that the container mounts a filesystem with access to the `core`, `extensions`, and `skins` directory. However, the MediaWiki-included docker-compose.yml file is under `core`. To work around this, go to the `mediawiki` directory, and create a symlink to this file:
+<code>
+ln -s core/docker-compose.yml docker-compose.yml
+</code>
+
+The mediawiki-jobrunner image expects that `core` will be the working directory for it's ENTRYPOINT, not `mediawiki`. To work around this, in the `mediawiki` directory, create a docker-compose.override.yml file with:
+<code>
+services:
+  mediawiki-jobrunner:
+    environment:
+      MW_INSTALL_PATH: /var/www/html/w/core
+    working_dir: /var/www/html/w/core
+</code>
+
+If that file already exists, then just merge these values into the yaml by hand.
+
 ### Grepping git repos ###
 Some grep wrappers are included for searching MediaWiki extension repos, of which there are 1000+.
 The must be run in a folder called "extensions" that contains the extension repos.
