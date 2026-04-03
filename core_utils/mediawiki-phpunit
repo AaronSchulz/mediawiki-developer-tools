@@ -50,7 +50,7 @@ function clean_mw_temp_dir() {
 }
 
 function prepare_mw_paratest_phpunit_config() {
-  prepare_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml.dist"
+  prepare_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml"
 }
 
 function prepare_mw_paratest_phpunit_config_file() {
@@ -75,7 +75,7 @@ function prepare_mw_paratest_phpunit_config_file() {
     local OUTPUT_BASE_PATH=""
     cd "${MW_CORE_DIR}/tests/phpunit"
 
-    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/phpunit.xml.dist")"
+    SUITE_FILE_XML="$(cat "${MW_CORE_DIR}/phpunit.xml")"
     if [[ "$(dirname "${FILE_RELPATH}")" == "." ]]; then
       OUTPUT_BASE_PATH="tests/phpunit/"
     fi
@@ -151,7 +151,7 @@ function prepare_mw_paratest_phpunit_config_file() {
 }
 
 function clean_mw_paratest_phpunit_config() {
-  clean_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml.dist"
+  clean_mw_paratest_phpunit_config_file "$1" "mwp_phpunit.xml"
 }
 
 function clean_mw_paratest_phpunit_config_file() {
@@ -182,6 +182,27 @@ function max_files_per_subsuite() {
     REMNANT=$((REMNANT / 4))
   done
   echo "${LOG}"
+}
+
+function prepare_mw_phpunit_config() {
+  local MW_CORE_DIR=$1
+	local TMPFS_DIR=$2
+	local MW_TMPDIR="${TMPFS_DIR}/${TMP_SUBDIR_NAME}"
+	local MW_LOGDIR="${MW_TMPDIR}/logs"
+
+	(
+		set -e
+		cd "${MW_CORE_DIR}"
+
+		PRESERVE_ENV=$(get_preserved_variables)
+		if [ -n "${PRESERVE_ENV}" ]; then
+		  echo "Environmental variables: ${PRESERVE_ENV}"
+		fi
+
+		exec sudo -u www-data -H --preserve-env="${PRESERVE_ENV}" \
+      env TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" MW_LOG_DIR="${MW_LOGDIR}" \
+      php tests/phpunit/generatePHPUnitConfig.php
+	)
 }
 
 function execute_mw_phpunit() {
@@ -238,7 +259,7 @@ function execute_mw_paratest() {
         --preserve-env="${PRESERVE_ENV}" \
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
         php "${MW_CORE_DIR}/vendor/bin/paratest" \
-        --configuration="mwp_phpunit.xml.dist" \
+        --configuration="mwp_phpunit.xml" \
         --tmp-dir="${MW_TMPDIR}" \
         --processes="${PROCESSES}" \
         --runner="Runner" \
@@ -254,7 +275,7 @@ function execute_mw_paratest() {
         env TEST_RUN_NO="${TEST_RUN_NO}" TMPDIR="${MW_TMPDIR}" MW_INSTALL_PATH="${MW_CORE_DIR}" \
         php "${HOME}/bin/paratest" \
         --phpunit "${MW_CORE_DIR}/vendor/bin/phpunit" \
-        --configuration="mwp_phpunit.xml.dist" \
+        --configuration="mwp_phpunit.xml" \
         --bootstrap="${MW_CORE_DIR}/tests/phpunit/bootstrap.php" \
         --tmp-dir "${MW_TMPDIR}" \
         --processes "${PROCESSES}" \
@@ -301,12 +322,14 @@ case $COMMAND in
 "dev_phpunit")
   DEV_MW_CORE=$(realpath $PWD)
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	prepare_mw_phpunit_config "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
 	execute_mw_phpunit "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "dev_paratest")
   DEV_MW_CORE=$(realpath $PWD)
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	prepare_mw_phpunit_config "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_paratest_phpunit_config "${DEV_MW_CORE}" || exit $?
 	execute_mw_paratest "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	clean_mw_paratest_phpunit_config "${DEV_MW_CORE}"
@@ -316,6 +339,7 @@ case $COMMAND in
 	SRV_MW_CORE="${SRV_MW_DIR}/core"
 	sync_srv_mediawiki || exit $?
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	prepare_mw_phpunit_config "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
 	execute_mw_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
@@ -323,6 +347,7 @@ case $COMMAND in
 	SRV_MW_CORE="${SRV_MW_DIR}/core"
 	sync_srv_mediawiki || exit $?
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
+	prepare_mw_phpunit_config "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_paratest_phpunit_config "${SRV_MW_CORE}" || exit $?
 	execute_mw_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
 	clean_mw_paratest_phpunit_config "${SRV_MW_CORE}"
