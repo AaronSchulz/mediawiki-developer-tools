@@ -129,9 +129,13 @@ In order for docker to work, it needs to be launched from the `mediawiki` direct
 ln -s core/docker-compose.yml docker-compose.yml
 </code>
 
-The mediawiki-jobrunner image expects that `core` will be the working directory for it's ENTRYPOINT, not `mediawiki`. To work around this, in the `mediawiki` directory, create a docker-compose.override.yml file with:
+The `mediawiki-jobrunner` image expects that `core` will be the working directory for it's ENTRYPOINT, not `mediawiki`. Also, the `mediawiki` image is used for maintenance scripts, which often aspect `core` to be the working directory. To work around this, in the `mediawiki` directory, create a docker-compose.override.yml file with:
 <code>
 services:
+  mediawiki:
+    environment:
+      MW_INSTALL_PATH: /var/www/html/w/core
+    working_dir: /var/www/html/w/core
   mediawiki-jobrunner:
     environment:
       MW_INSTALL_PATH: /var/www/html/w/core

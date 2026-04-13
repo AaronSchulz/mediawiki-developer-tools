@@ -68,6 +68,11 @@ alias mwscript='sudo -u www-data --preserve-env=MW_DB,XDEBUG_MODE,XDEBUG_TRIGGER
 # Convenience wrapper to synchronize /srv/mediawiki with PhpStormProjects/mediawiki
 alias syncsrvmediawiki="sudo -u www-data --preserve-env=DEV_MW_DIR,SRV_MW_DIR ${HOME}/bin/sync-srv-mediawiki"
 
+# Convenience for Docker-MediaWiki
+alias mwd-exec='docker compose exec mediawiki'
+alias mwd-bash='docker compose exec mediawiki bash'
+alias mwd-maint='docker compose exec mediawiki php maintenance/run.php'
+
 # Convenience launchers for common editors
 function pnotepad {
 	WSLPATH=$(wslpath -w "$1")
