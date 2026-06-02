@@ -1,14 +1,13 @@
-
 [client-server.#NODE_SECTION#]
 port                    = 33#NODE_ID#6
-socket                  = /run/mysqld-multi/#NODE#.sock
+socket                  = /run/mariadb-multi/#NODE#.sock
 
 [mariadb.#NODE_SECTION#]
 user                    = mysql
-pid_file                = /run/mysqld-multi/#NODE#.pid
-datadir                 = /var/lib/mysql-multi/#NODE#
-log_bin                 = /var/log/mysql-multi/#NODE#/mysql-bin.log
-log_error               = /var/log/mysql-multi/#NODE#/error.log
+pid_file                = /run/mariadb-multi/#NODE#.pid
+datadir                 = /var/lib/mariadb-multi/#NODE#
+log_bin                 = /var/log/mariadb-multi/#NODE#/mysql-bin.log
+log_error               = /var/log/mariadb-multi/#NODE#/error.log
 log_basename            = #NODE#
 server_id               = 1#NODE_ID#
 performance_schema      = on

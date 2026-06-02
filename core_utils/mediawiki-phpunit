@@ -323,7 +323,7 @@ case $COMMAND in
   DEV_MW_CORE=$(realpath $PWD)
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_phpunit_config "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
-	execute_mw_phpunit "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	execute_mw_phpunit "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "dev_paratest")
@@ -331,7 +331,7 @@ case $COMMAND in
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_phpunit_config "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_paratest_phpunit_config "${DEV_MW_CORE}" || exit $?
-	execute_mw_paratest "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	execute_mw_paratest "${DEV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1
 	clean_mw_paratest_phpunit_config "${DEV_MW_CORE}"
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
@@ -340,7 +340,7 @@ case $COMMAND in
 	sync_srv_mediawiki || exit $?
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_phpunit_config "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
-	execute_mw_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	execute_mw_phpunit "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;
 "srv_paratest")
@@ -349,7 +349,7 @@ case $COMMAND in
 	prepare_mw_temp_dir "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_phpunit_config "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" || exit $?
 	prepare_mw_paratest_phpunit_config "${SRV_MW_CORE}" || exit $?
-	execute_mw_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1 | less -R
+	execute_mw_paratest "${SRV_MW_CORE}" "${TMPDIR_MOUNT}" 2>&1
 	clean_mw_paratest_phpunit_config "${SRV_MW_CORE}"
 	clean_mw_temp_dir "${TMPDIR_MOUNT}"
 	;;

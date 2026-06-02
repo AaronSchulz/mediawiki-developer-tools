@@ -4,17 +4,16 @@ REAL_PATH=$(realpath "$0")
 BASE_DIR=$(dirname "$REAL_PATH")
 NODES=("db1 db2 db3 db4")
 
-RESET=0
-if [ "$1" == "reset" ]; then
+if [ "$1" == "init" ]; then
+  RESET=0;
+elif [ "$1" == "reset" ]; then
   RESET=1;
+else
+  echo 'Usage: setup_multi_mariadb [init|reset]'
+  exit 1
 fi
 
 cd ~
-
-if grep "\[mysqld\]" "/etc/mysql/mariadb.conf.d/50-server.cnf"; then
-  echo "The stock server must be moved to a group (e.g. [mysqld.main])"
-  exit 1
-fi
 
 for NODE in $NODES; do
   echo "Unregistering/stopping any prior ${NODE} service..."
@@ -23,37 +22,37 @@ for NODE in $NODES; do
 done
 
 echo 'Setting base directories...'
-if [ ! -d "/var/lib/mysql-multi" ]; then
-  sudo mkdir "/var/lib/mysql-multi" || exit $?
-  sudo chown -R mysql:mysql "/var/lib/mysql-multi" || exit $?
+if [ ! -d "/var/lib/mariadb-multi" ]; then
+  sudo mkdir "/var/lib/mariadb-multi" || exit $?
+  sudo chown -R mysql:mysql "/var/lib/mariadb-multi" || exit $?
 fi
-if [ ! -d "/var/log/mysql-multi" ]; then
-  sudo mkdir -m 0774 "/var/log/mysql-multi" || exit $?
-  sudo chown -R mysql:adm "/var/log/mysql-multi" || exit $?
+if [ ! -d "/var/log/mariadb-multi" ]; then
+  sudo mkdir -m 0775 "/var/log/mariadb-multi" || exit $?
+  sudo chown -R mysql:adm "/var/log/mariadb-multi" || exit $?
 fi
-if [ ! -d "/run/mysql-multi" ]; then
-  sudo mkdir "/run/mysql-multi" || exit $?
-  sudo chown -R mysql:mysql "/run/mysql-multi" || exit $?
+if [ ! -d "/run/mariadb-multi" ]; then
+  sudo mkdir "/run/mariadb-multi" || exit $?
+  sudo chown -R mysql:mysql "/run/mariadb-multi" || exit $?
 fi
-if [ ! -f "/usr/lib/tmpfiles.d/mysql-multi.conf" ]; then
+if [ ! -f "/usr/lib/tmpfiles.d/mariadb-multi.conf" ]; then
   # Create temporary /var/run directory on boot
-  echo "d /run/mysqld-multi 0755 mysql mysql  -" | sudo tee "/etc/tmpfiles.d/mysql-multi.conf"
+  echo "d /run/mariadb-multi 0755 mysql mysql  -" | sudo tee "/etc/tmpfiles.d/mariadb-multi.conf"
 fi
 for NODE in $NODES; do
   if [ $RESET -eq 1 ]; then
     echo "Removing ${NODE} data directories"
-    sudo rm -rf "/var/lib/mysql-multi/${NODE}" || exit $?
-    sudo rm -rf "/var/log/mysql-multi/${NODE}" || exit $?
+    sudo rm -rf "/var/lib/mariadb-multi/${NODE}" || exit $?
+    sudo rm -rf "/var/log/mariadb-multi/${NODE}" || exit $?
   fi
-  if [ ! -d "/var/lib/mysql-multi/${NODE}" ]; then
+  if [ ! -d "/var/lib/mariadb-multi/${NODE}" ]; then
     echo "Setting ${NODE} data directory"
-    sudo mkdir "/var/lib/mysql-multi/${NODE}" || exit $?
-    sudo chown -R mysql "/var/lib/mysql-multi/${NODE}" || exit $?
+    sudo mkdir -m 0771 "/var/lib/mariadb-multi/${NODE}" || exit $?
+    sudo chown -R mysql:mysql "/var/lib/mariadb-multi/${NODE}" || exit $?
   fi
-  if [ ! -d "/var/log/mysql-multi/${NODE}" ]; then
+  if [ ! -d "/var/log/mariadb-multi/${NODE}" ]; then
     echo "Setting ${NODE} log directory"
-    sudo mkdir -m 0774 "/var/log/mysql-multi/${NODE}" || exit $?
-    sudo chown -R mysql:adm "/var/log/mysql-multi/${NODE}" || exit $?
+    sudo mkdir -m 0775 "/var/log/mariadb-multi/${NODE}" || exit $?
+    sudo chown -R mysql:adm "/var/log/mariadb-multi/${NODE}" || exit $?
   fi
 done
 
@@ -64,35 +63,38 @@ for NODE in $NODES; do
   NODE_ID=$(echo "${NODE}" | grep -Po '\d+$')
   sed -e "s/#NODE#/${NODE}/g;s/#NODE_ID#/${NODE_ID}/g;s/#NODE_SECTION#/${NODE}/g" "${BASE_DIR}/server-client-NODE.cnf" >> "multi-server-client.cnf" || exit $?
   sed -e "s/#NODE#/${NODE}/g;s/#NODE_ID#/${NODE_ID}/g;s/.#NODE_SECTION#//g" "${BASE_DIR}/server-client-NODE.cnf" > "${NODE}.cnf" || exit $?
-  sudo cp "${NODE}.cnf" "/etc/mysql/" || exit $?
+  sudo cp "${NODE}.cnf" "/etc/mysql/mariadb.conf.d/" || exit $?
 done
 echo 'Setting combined config...'
-sudo cp "multi-server-client.cnf" "/etc/mysql/conf.d/100-multi-server-client.cnf" || exit $?
+sudo cp "multi-server-client.cnf" "/etc/mysql/mariadb.conf.d/20-multi-server-client.cnf" || exit $?
 
 for NODE in $NODES; do
-  if [ ! -f "/var/lib/mysql-multi/${NODE}/ibdata1" ]; then
+  if [ ! -f "/var/lib/mariadb-multi/${NODE}/ibdata1" ]; then
     echo "Installing ${NODE} instance..."
-    if ! my_print_defaults -g ".${NODE}" --mysqld | grep "datadir=/var/lib/mysql-multi/${NODE}"; then
+    if ! my_print_defaults --mariadbd "mariadb.${NODE}" | grep "datadir=/var/lib/mariadb-multi/${NODE}"; then
       echo "Group configuration test failed: group section config absent!";
+      my_print_defaults --mariadbd "mariadb.${NODE}"
       exit 1
     fi
-    if my_print_defaults -g ".${NODE}" --mysqld | grep "/run/mysqld/mysqld.sock"; then
+    if my_print_defaults --mariadbd "mariadb.${NODE}" | grep "/run/mysqld/mysqld.sock"; then
       echo "Group configuration test failed: bogus stock config present!";
+      my_print_defaults --mariadbd "mariadb.${NODE}"
       exit 1
     fi
-    sudo mariadb-install-db --defaults-group-suffix=".${NODE}" --datadir="/var/lib/mysql-multi/${NODE}" || exit $?
+    sudo -u mysql mariadb-install-db --user=mysql --no-defaults --defaults-file="/etc/mysql/mariadb.conf.d/${NODE}.cnf" || exit $?
   fi
 done
 
 for NODE in $NODES; do
   echo "Registering ${NODE} service..."
-  sudo systemctl enable "mariadb@${NODE}.service"|| exit $?
+  sudo systemctl enable "mariadb@${NODE}.service" || exit $?
+  echo "Starting ${NODE} service..."
   if ! sudo systemctl start "mariadb@${NODE}.service"; then
     CODE=$?
     sudo systemctl status "mariadb@${NODE}.service" --no-pager
-    if [ -f "/var/log/mysql-multi/${NODE}/error.log" ]; then
+    if [ -f "/var/log/mariadb-multi/${NODE}/error.log" ]; then
       echo ''
-      sudo tail -n 30 "/var/log/mysql-multi/${NODE}/error.log"
+      sudo tail -n 30 "/var/log/mariadb-multi/${NODE}/error.log"
     fi
     exit $CODE
   fi
