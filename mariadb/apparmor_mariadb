@@ -1,3 +1,4 @@
+# /etc/apparmor.d/mariadbd
 # AppArmor profile for MariaDB 11.8 server daemon
 #
 # TESTING:
