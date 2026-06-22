@@ -22,6 +22,9 @@ for NODE in $NODES; do
 done
 
 echo 'Setting base directories...'
+if [ ! -d "/etc/mariadb-multi" ]; then
+  sudo mkdir "/etc/mariadb-multi" || exit $?
+fi
 if [ ! -d "/var/lib/mariadb-multi" ]; then
   sudo mkdir "/var/lib/mariadb-multi" || exit $?
   sudo chown -R mysql:mysql "/var/lib/mariadb-multi" || exit $?
@@ -46,7 +49,7 @@ for NODE in $NODES; do
   fi
   if [ ! -d "/var/lib/mariadb-multi/${NODE}" ]; then
     echo "Setting ${NODE} data directory"
-    sudo mkdir -m 0771 "/var/lib/mariadb-multi/${NODE}" || exit $?
+    sudo mkdir -m 0775 "/var/lib/mariadb-multi/${NODE}" || exit $?
     sudo chown -R mysql:mysql "/var/lib/mariadb-multi/${NODE}" || exit $?
   fi
   if [ ! -d "/var/log/mariadb-multi/${NODE}" ]; then
@@ -63,7 +66,7 @@ for NODE in $NODES; do
   NODE_ID=$(echo "${NODE}" | grep -Po '\d+$')
   sed -e "s/#NODE#/${NODE}/g;s/#NODE_ID#/${NODE_ID}/g;s/#NODE_SECTION#/${NODE}/g" "${BASE_DIR}/server-client-NODE.cnf" >> "multi-server-client.cnf" || exit $?
   sed -e "s/#NODE#/${NODE}/g;s/#NODE_ID#/${NODE_ID}/g;s/.#NODE_SECTION#//g" "${BASE_DIR}/server-client-NODE.cnf" > "${NODE}.cnf" || exit $?
-  sudo cp "${NODE}.cnf" "/etc/mysql/mariadb.conf.d/" || exit $?
+  sudo cp "${NODE}.cnf" "/etc/mariadb-multi/" || exit $?
 done
 echo 'Setting combined config...'
 sudo cp "multi-server-client.cnf" "/etc/mysql/mariadb.conf.d/20-multi-server-client.cnf" || exit $?
@@ -71,20 +74,22 @@ sudo cp "multi-server-client.cnf" "/etc/mysql/mariadb.conf.d/20-multi-server-cli
 for NODE in $NODES; do
   if [ ! -f "/var/lib/mariadb-multi/${NODE}/ibdata1" ]; then
     echo "Installing ${NODE} instance..."
-    if ! my_print_defaults --mariadbd "mariadb.${NODE}" | grep "datadir=/var/lib/mariadb-multi/${NODE}"; then
+    if ! my_print_defaults --defaults-group-suffix=".${NODE}" --mariadbd | grep "/var/lib/mariadb-multi/${NODE}"; then
       echo "Group configuration test failed: group section config absent!";
-      my_print_defaults --mariadbd "mariadb.${NODE}"
+      my_print_defaults --defaults-group-suffix=".${NODE}" --mariadbd
       exit 1
     fi
-    if my_print_defaults --mariadbd "mariadb.${NODE}" | grep "/run/mysqld/mysqld.sock"; then
+    if ! my_print_defaults --defaults-group-suffix=".${NODE}" --mariadbd | grep "/run/mariadb-multi/${NODE}"; then
       echo "Group configuration test failed: bogus stock config present!";
-      my_print_defaults --mariadbd "mariadb.${NODE}"
+      my_print_defaults --defaults-group-suffix=".${NODE}" --mariadbd
       exit 1
     fi
-    sudo -u mysql mariadb-install-db --user=mysql --no-defaults --defaults-file="/etc/mysql/mariadb.conf.d/${NODE}.cnf" || exit $?
+    sudo -u mysql mariadb-install-db --user=mysql --defaults-group-suffix=".${NODE}" || exit $?
   fi
 done
 
+# TODO: AppArmor for mariadbd
+# TODO: doesn't work without file-based /etc/systemd/system/mariadb@.service.d/multi.conf
 for NODE in $NODES; do
   echo "Registering ${NODE} service..."
   sudo systemctl enable "mariadb@${NODE}.service" || exit $?

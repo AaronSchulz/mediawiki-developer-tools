@@ -1,9 +1,11 @@
-[client-server.#NODE_SECTION#]
+[client.#NODE_SECTION#]
 port                    = 33#NODE_ID#6
 socket                  = /run/mariadb-multi/#NODE#.sock
 
-[mariadb.#NODE_SECTION#]
+[server.#NODE_SECTION#]
 user                    = mysql
+port                    = 33#NODE_ID#6
+socket                  = /run/mariadb-multi/#NODE#.sock
 pid_file                = /run/mariadb-multi/#NODE#.pid
 datadir                 = /var/lib/mariadb-multi/#NODE#
 log_bin                 = /var/log/mariadb-multi/#NODE#/mysql-bin.log
